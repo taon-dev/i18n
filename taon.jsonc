@@ -29,7 +29,6 @@
   "packageJsonOverride": {
     "author": "Darek",
     "description": "Description for i18n. Hello world!",
-    "private": true,
     "scripts": {}
   }
 }
