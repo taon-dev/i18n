@@ -1,5 +1,3 @@
 # i18n
 
-Hello from Standalone Project
-
-       
+Based on https://github.com/marcindz88/transignal

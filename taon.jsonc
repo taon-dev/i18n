@@ -22,6 +22,8 @@
     "taskName": "localhost"
   }],
 
+  "overrideNpmName": "@taon-dev/i18n",
+
   "shouldGenerateAutogenIndexFile": true,
 
   "packageJsonOverride": {
