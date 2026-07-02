@@ -80,7 +80,7 @@ import { ENV_ANGULAR_NODE_APP_BUILD_PWA_DISABLE_SERVICE_WORKER } from './lib/env
 console.log('🚀 [ TAON IS STARTING ]');
 //#endregion
 
-//#region i18n component
+//#region i-18-n component
 //#region @browser
 @Component({
   selector: 'app-root',
@@ -161,7 +161,7 @@ console.log('🚀 [ TAON IS STARTING ]');
           <mat-card class="m-2">
             <mat-card-content>
               <h3>Basic app info</h3>
-              Name: i18n<br />
+              Name: i-18-n<br />
               Angular version: {{ angularVersion }}<br />
               Taon backend: {{ taonMode }}<br />
             </mat-card-content>
@@ -202,7 +202,7 @@ console.log('🚀 [ TAON IS STARTING ]');
         <footer
           class="text-center p-4 w-full select-none"
           (click)="taonAdminService.enableDeveloperIf5Timetap()">
-          Copyright <strong>i18n</strong> {{ year }}
+          Copyright <strong>i-18-n</strong> {{ year }}
         </footer>
       }
     </taon-admin-mode-configuration>
@@ -313,7 +313,7 @@ export class I18NApp implements OnInit {
 //#endregion
 //#endregion
 
-//#region  i18n api service
+//#region  i-18-n api service
 
 //#region @browser
 @Injectable({
@@ -333,7 +333,7 @@ export class UserApiService extends TaonBaseAngularService {
 
 //#endregion
 
-//#region  i18n routes
+//#region  i-18-n routes
 //#region @browser
 export const I18NServerRoutes: ServerRoute[] = [
   {
@@ -364,7 +364,7 @@ export const I18NClientRoutes: Routes = [
 //#endregion
 //#endregion
 
-//#region  i18n app configs
+//#region  i-18-n app configs
 //#region @browser
 export const I18NAppConfig: ApplicationConfig = {
   providers: [
@@ -410,7 +410,7 @@ export const I18NConfig = mergeApplicationConfig(
 //#endregion
 //#endregion
 
-//#region  i18n entity
+//#region  i-18-n entity
 @TaonEntity({ className: 'User' })
 class User extends TaonBaseAbstractEntity {
   //#region @websql
@@ -424,7 +424,7 @@ class User extends TaonBaseAbstractEntity {
 }
 //#endregion
 
-//#region  i18n controller
+//#region  i-18-n controller
 @TaonController({ className: 'UserController' })
 class UserController extends TaonBaseCrudController<User> {
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -452,7 +452,7 @@ class UserController extends TaonBaseCrudController<User> {
 }
 //#endregion
 
-//#region  i18n migration
+//#region  i-18-n migration
 
 //#region @websql
 @TaonMigration({
@@ -471,7 +471,7 @@ class UserMigration extends TaonBaseMigration {
 
 //#endregion
 
-//#region  i18n context
+//#region  i-18-n context
 var I18NContext = Taon.createContext(() => ({
   ...HOST_CONFIG['I18NContext'],
   contexts: { TaonBaseContext },
@@ -497,7 +497,7 @@ var I18NContext = Taon.createContext(() => ({
 }));
 //#endregion
 
-//#region  i18n start function
+//#region  i-18-n start function
 export const I18NStartFunction = async (
   startParams?: Taon.StartParams,
 ): Promise<void> => {
