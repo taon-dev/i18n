@@ -163,6 +163,29 @@ TRANSLATE PIPIE<br />
       `<input translate  [translate-t]="t"/>`,
     );
   });
+
+  it('Should handle angular stuff', () => {
+    const html = `
+
+    <ng-template #loadingVideos>
+  @if (stateService.isLoadingVideos$ | async) {
+    <div class="p-4">
+      <h3
+        class="w-full"
+        translate>
+        Please wait...
+      </h3>
+      <mat-progress-bar mode="indeterminate" />
+    </div>
+  }
+</ng-template>
+
+    `;
+
+    expect(
+      UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html),
+    ).to.includes(`[translate-t]="t"`);
+  });
 });
 
 describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {

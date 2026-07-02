@@ -114,8 +114,6 @@ export namespace UtilsI18nHtml {
   }
   //#endregion
 
-  //#region helpers
-
   function extractGettextCallsFromHtmlExpression(source: string): Array<{
     gettextString: string;
     context?: string;
@@ -553,38 +551,46 @@ export namespace UtilsI18nHtml {
   export function replaceTranslatePipieDirectiveTContext(html: string): string {
     const edits: Array<{ index: number; text: string }> = [];
 
-    const parsed = parseTemplate(html, 'template.html', {
-      preserveWhitespaces: true,
-    });
+    try {
+      const parsed = parseTemplate(html, 'template.html', {
+        preserveWhitespaces: true,
+      });
 
-    const visit = (node: any): void => {
-      if (hasTranslateDirective(node) && !hasTranslateTInput(node)) {
-        const opening = node.startSourceSpan?.toString?.();
+      const visit = (node: any): void => {
+        if (hasTranslateDirective(node) && !hasTranslateTInput(node)) {
+          const opening = node.startSourceSpan?.toString?.();
 
-        if (opening) {
-          const start = node.startSourceSpan.start.offset;
-          const insertAt = findOpenTagInsertPosition(
-            html,
-            start,
-            opening.length,
-          );
+          if (opening) {
+            const start = node.startSourceSpan.start.offset;
+            const insertAt = findOpenTagInsertPosition(
+              html,
+              start,
+              opening.length,
+            );
 
-          if (insertAt !== -1) {
-            edits.push({
-              index: insertAt,
-              text: ` [translate-t]="t"`,
-            });
+            if (insertAt !== -1) {
+              edits.push({
+                index: insertAt,
+                text: ` [translate-t]="t"`,
+              });
+            }
           }
         }
-      }
 
-      for (const child of node.children ?? []) {
-        visit(child);
-      }
-    };
+        for (const child of node.children ?? []) {
+          visit(child);
+        }
+      };
 
-    for (const node of parsed.nodes) {
-      visit(node);
+      for (const node of parsed.nodes) {
+        visit(node);
+      }
+    } catch {
+      // fallback below
+    }
+
+    if (edits.length === 0) {
+      edits.push(...findTranslateDirectiveEditsFromSource(html));
     }
 
     let result = applyEdits(html, edits);
@@ -596,9 +602,39 @@ export namespace UtilsI18nHtml {
 
     return result;
   }
-  //#endregion
 
-  //#region helpers
+  function findTranslateDirectiveEditsFromSource(
+    html: string,
+  ): Array<{ index: number; text: string }> {
+    const edits: Array<{ index: number; text: string }> = [];
+
+    const tagRegex = /<([a-zA-Z0-9-]+)\b[^>]*\btranslate\b[^>]*>/g;
+
+    for (const match of html.matchAll(tagRegex)) {
+      const tag = match[0];
+      const start = match.index ?? 0;
+
+      if (/\[translate-t\]\s*=/.test(tag) || /\btranslateT\b/.test(tag)) {
+        continue;
+      }
+
+      const closeIndex = tag.lastIndexOf('>');
+      if (closeIndex === -1) continue;
+
+      const beforeClose = tag.slice(0, closeIndex);
+      const insertAt = beforeClose.trimEnd().endsWith('/')
+        ? start + beforeClose.lastIndexOf('/')
+        : start + closeIndex;
+
+      edits.push({
+        index: insertAt,
+        text: ` [translate-t]="t"`,
+      });
+    }
+
+    return edits;
+  }
+
   function hasTranslateDirective(node: any): boolean {
     return [...(node.attributes ?? []), ...(node.templateAttrs ?? [])].some(
       (attr: any) => attr.name === 'translate',
@@ -645,5 +681,6 @@ export namespace UtilsI18nHtml {
         return acc.slice(0, edit.index) + edit.text + acc.slice(edit.index);
       }, input);
   }
+
   //#endregion
 }
