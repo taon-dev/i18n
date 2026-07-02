@@ -68,7 +68,7 @@ export class TranslationManager {
   public readonly availableLangs$ = this.availableLangsSrc.asObservable().pipe(
     map(f => {
       if (this.visibleLanguages.length > 0) {
-        console.log('Filtering langs')
+        // console.log('Filtering langs')
         return f.filter(a => this.visibleLanguages.includes(a.code));
       }
       return f;

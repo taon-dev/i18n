@@ -75,7 +75,7 @@ export class Translation {
     //#region @browser
     if (this.useGlobalFileLang) {
       this.localFileLang = Translation.manager.currentGlobalLanguage;
-      console.log(`Update on t.for() ${this.localFileLang}`)
+      // console.log(`Update on t.for() ${this.localFileLang}`)
     }
     try {
       this.cdr = inject(ChangeDetectorRef);

@@ -367,6 +367,48 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
     ]);
   });
 
+  it('should extract when new angula syntax', () => {
+    const html = `
+ @for (vid of section.children; track vid.productId) {
+      @let isLoggedIn = session.isLoggedIn$ | async;
+      @let isProcessing =
+        processingPaymentInProgressForProductId.includes(vid.parentId);
+      @let isAuthorized = authorizedSectionsId.includes(vid.parentId);
+      @let title =
+        isProcessing
+          ? t.gettext('Processing Payment. Please wait.')
+          : vid.productTitle;
+
+      <div class="col-span-12 p-2 md:col-span-6 lg:col-span-4">
+        <h4 class="mt-0 md:hidden">
+          {{ title }}
+        </h4>
+
+        <h4
+          class="mt-0 hidden w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap md:block">
+          {{ title }}
+        </h4>
+
+        <taon-youtube-video
+          [videoId]="vid.productId"
+          [matTooltip]="vid.productTitle"
+          height="222px"
+          [state]="
+            isLoggedIn && isAuthorized
+              ? 'video-preview-private'
+              : 'preview-picture-locked'
+          "
+          (paddlockClicked)="isLoggedIn ? confirmBuy(vid) : paddlockClicked()">
+        </taon-youtube-video>
+
+        <br /><br />
+      </div>
+    }
+`;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html).length).to.be.above(0);
+  });
+
   // it('skips gettext with template interpolation', () => {
   //   const html = `
   //     <span>{{ t.gettext(\`Hello \${name}\`) }}</span>
