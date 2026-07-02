@@ -13,10 +13,10 @@ import {
   TmplAstTemplate,
   TmplAstText,
 } from '@angular/compiler';
-
 import { UtilsI18n } from 'tnp-core/src';
 
 export namespace UtilsI18nHtml {
+  //#region extract gettext translate from html
   export function extractGettextTranslateFromHtml(
     html: string,
     fileName = 'template.html',
@@ -81,6 +81,12 @@ export namespace UtilsI18nHtml {
         //   pushMessage(node, text);
         // }
 
+        for (const item of extractGettextCallsFromHtmlExpression(
+          node.sourceSpan.toString(),
+        )) {
+          pushMessage(node, item.gettextString, null, item.context);
+        }
+
         const fromAst = extractTranslatePipeStrings(node.value);
         const fromSource = extractTranslatePipeStringsFromSource(
           node.sourceSpan.toString(),
@@ -101,6 +107,114 @@ export namespace UtilsI18nHtml {
     }
 
     return uniqueMessages(messages);
+  }
+  //#endregion
+
+  //#region helpers
+
+  function extractGettextCallsFromHtmlExpression(source: string): Array<{
+    gettextString: string;
+    context?: string;
+  }> {
+    const result: Array<{
+      gettextString: string;
+      context?: string;
+    }> = [];
+
+    const expression = source
+      .replace(/^\s*\{\{\s*/, '')
+      .replace(/\s*\}\}\s*$/, '')
+      .trim();
+
+    const gettextCallRegex = /(?:^|[\s(])(?:[a-zA-Z_$][\w$]*\.)*gettext\s*\(/g;
+
+    for (const match of expression.matchAll(gettextCallRegex)) {
+      const openParenIndex = match.index! + match[0].lastIndexOf('(');
+      const argsSource = readBalancedParenthesesContent(
+        expression,
+        openParenIndex,
+      );
+
+      if (!argsSource) continue;
+
+      const args = splitTopLevel(argsSource, ',');
+
+      const gettextString = readStaticStringArg(args[0]);
+      if (!gettextString) continue;
+
+      const context = readStaticStringArg(args[2]);
+
+      result.push({
+        gettextString,
+        context,
+      });
+    }
+
+    return result;
+  }
+
+  function readBalancedParenthesesContent(
+    source: string,
+    openParenIndex: number,
+  ): string | null {
+    let depth = 0;
+    let quote: string | null = null;
+    let result = '';
+
+    for (let i = openParenIndex; i < source.length; i++) {
+      const char = source[i];
+
+      if (quote) {
+        if (i !== openParenIndex) result += char;
+
+        if (char === quote && source[i - 1] !== '\\') {
+          quote = null;
+        }
+
+        continue;
+      }
+
+      if (char === '"' || char === "'" || char === '`') {
+        quote = char;
+        if (i !== openParenIndex) result += char;
+        continue;
+      }
+
+      if (char === '(') {
+        depth++;
+
+        if (depth > 1) result += char;
+        continue;
+      }
+
+      if (char === ')') {
+        depth--;
+
+        if (depth === 0) {
+          return result.trim();
+        }
+
+        result += char;
+        continue;
+      }
+
+      if (i !== openParenIndex) {
+        result += char;
+      }
+    }
+
+    return null;
+  }
+
+  function readStaticStringArg(arg: string | undefined): string | undefined {
+    if (!arg) return undefined;
+
+    const trimmed = arg.trim();
+
+    const match = trimmed.match(/^(['"`])([\s\S]*)\1$/);
+    if (!match) return undefined;
+
+    return match[2];
   }
 
   function extractTranslateParamsFromSource(
@@ -393,4 +507,103 @@ export namespace UtilsI18nHtml {
       return true;
     });
   }
+  //#endregion
+
+  //#region replace translate pipie directive t context
+  export function replaceTranslatePipieDirectiveTContext(html: string): string {
+    const edits: Array<{ index: number; text: string }> = [];
+
+    const parsed = parseTemplate(html, 'template.html', {
+      preserveWhitespaces: true,
+    });
+
+    const visit = (node: any): void => {
+      if (hasTranslateDirective(node) && !hasTranslateTInput(node)) {
+        const opening = node.startSourceSpan?.toString?.();
+
+        if (opening) {
+          const start = node.startSourceSpan.start.offset;
+          const insertAt = findOpenTagInsertPosition(
+            html,
+            start,
+            opening.length,
+          );
+
+          if (insertAt !== -1) {
+            edits.push({
+              index: insertAt,
+              text: ` [translate-t]="t"`,
+            });
+          }
+        }
+      }
+
+      for (const child of node.children ?? []) {
+        visit(child);
+      }
+    };
+
+    for (const node of parsed.nodes) {
+      visit(node);
+    }
+
+    let result = applyEdits(html, edits);
+
+    result = result.replace(
+      /\|\s*translate(?!\s*:)(?=[\s)}\]"';<]|$)/g,
+      '| translate:t',
+    );
+
+    return result;
+  }
+  //#endregion
+
+  //#region helpers
+  function hasTranslateDirective(node: any): boolean {
+    return [...(node.attributes ?? []), ...(node.templateAttrs ?? [])].some(
+      (attr: any) => attr.name === 'translate',
+    );
+  }
+
+  function hasTranslateTInput(node: any): boolean {
+    return [
+      ...(node.inputs ?? []),
+      ...(node.templateAttrs ?? []),
+      ...(node.attributes ?? []),
+    ].some(
+      (attr: any) => attr.name === 'translate-t' || attr.name === 'translateT',
+    );
+  }
+
+  function findOpenTagInsertPosition(
+    html: string,
+    start: number,
+    length: number,
+  ): number {
+    const end = start + length;
+    const openingTag = html.slice(start, end);
+
+    const closeIndex = openingTag.lastIndexOf('>');
+    if (closeIndex === -1) return -1;
+
+    const beforeClose = openingTag.slice(0, closeIndex);
+
+    if (beforeClose.trimEnd().endsWith('/')) {
+      return start + beforeClose.lastIndexOf('/');
+    }
+
+    return start + closeIndex;
+  }
+
+  function applyEdits(
+    input: string,
+    edits: Array<{ index: number; text: string }>,
+  ): string {
+    return [...edits]
+      .sort((a, b) => b.index - a.index)
+      .reduce((acc, edit) => {
+        return acc.slice(0, edit.index) + edit.text + acc.slice(edit.index);
+      }, input);
+  }
+  //#endregion
 }
