@@ -106,6 +106,10 @@ export namespace UtilsI18nHtml {
       visit(node);
     }
 
+    if (messages.length === 0) {
+      messages.push(...extractTranslateDirectiveFromSource(html));
+    }
+
     return uniqueMessages(messages);
   }
   //#endregion
@@ -375,6 +379,42 @@ export namespace UtilsI18nHtml {
     }
 
     return result;
+  }
+
+  function extractTranslateDirectiveFromSource(
+    html: string,
+  ): UtilsI18n.GettextExtracted[] {
+    const messages: UtilsI18n.GettextExtracted[] = [];
+
+    const regex =
+      /<([a-zA-Z0-9-]+)(?=[^>]*\stranslate(?:\s|>|=))[^>]*>([\s\S]*?)<\/\1>/g;
+
+    for (const match of html.matchAll(regex)) {
+      const fullMatch = match[0];
+      const innerHtml = match[2];
+
+      const index = match.index ?? 0;
+      const lineNumber = html.slice(0, index).split(/\r?\n/).length;
+
+      const text = normalizeHtmlText(stripHtml(innerHtml));
+      if (!text) continue;
+
+      const contextMatch = fullMatch.match(
+        /\stranslate\s*=\s*["']([^"']+)["']/,
+      );
+
+      messages.push({
+        lineNumber,
+        gettextString: text,
+        context: contextMatch?.[1],
+      });
+    }
+
+    return messages;
+  }
+
+  function stripHtml(html: string): string {
+    return html.replace(/<[^>]+>/g, '');
   }
 
   function extractTranslateParams(

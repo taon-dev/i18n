@@ -217,7 +217,9 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
     `;
 
     expect(
-      UtilsI18nHtml.extractGettextTranslateFromHtml(html).map(x => x.gettextString),
+      UtilsI18nHtml.extractGettextTranslateFromHtml(html).map(
+        x => x.gettextString,
+      ),
     ).toEqual(['Yes', 'No']);
   });
 
@@ -282,6 +284,61 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
         lineNumber: 1,
         gettextString: 'Select Language',
         // params: null,
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('should extract trasnlated please wait', () => {
+    const html = `
+     <div class="p-4">
+      <h3 class="w-full" translate>Please wait...</h3>
+      <mat-progress-bar mode="indeterminate" />
+    </div>
+    `;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 3,
+        gettextString: 'Please wait...',
+        // params: null,
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('should extract file with angular syntax', () => {
+    const html = `
+
+
+  @if (stateService.isLoadingVideos$ | async) {
+    <div class="p-4">
+      <h3 class="w-full" translate >Please wait...</h3>
+      <mat-progress-bar mode="indeterminate" />
+    </div>
+  }
+
+    `;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html).length).be.above(
+      0,
+    );
+  });
+
+  it('should extract file with angular block syntax', () => {
+    const html = `
+  @if (stateService.isLoadingVideos$ | async) {
+    <div class="p-4">
+      <h3 class="w-full" translate>Please wait...</h3>
+      <mat-progress-bar mode="indeterminate" />
+    </div>
+  }
+`;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 4,
+        gettextString: 'Please wait...',
         context: undefined,
       },
     ]);
