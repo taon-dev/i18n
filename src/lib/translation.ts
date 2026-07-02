@@ -30,7 +30,7 @@ export class Translation {
   ): Translation {
     return new Translation(
       fileRelativePath,
-      Translation.manager.getGlobalFileLang(),
+      Translation.manager.currentGlobalLanguage,
       langImportMap,
     );
   }
@@ -54,6 +54,8 @@ export class Translation {
   private loadedLang?: UtilsI18n.CommonLocaleCode;
 
   private readonly bindings = new Set<TranslationBinding>();
+
+  private useGlobalLangFile = true;
   //#endregion
 
   //#region constructor
@@ -71,6 +73,10 @@ export class Translation {
   //#region for
   for(_classThis: object): Translation {
     //#region @browser
+    if (this.useGlobalFileLang) {
+      this.localFileLang = Translation.manager.currentGlobalLanguage;
+      console.log(`Update on t.for() ${this.localFileLang}`)
+    }
     try {
       this.cdr = inject(ChangeDetectorRef);
     } catch {
@@ -85,6 +91,7 @@ export class Translation {
 
   //#region change file lang
   async changeFileLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
+    this.useGlobalLangFile = false;
     this.localFileLang = lang;
     await this.ensureLoaded(true);
     //#region @browser
@@ -94,9 +101,9 @@ export class Translation {
   //#endregion
 
   //#region use global file lang
-  async useGlobalFileLang(): Promise<void> {
-    this.localFileLang = Translation.manager.getGlobalFileLang();
-    void this.ensureLoaded(true);
+  async useGlobalFileLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
+    this.useGlobalLangFile = true;
+    await this.ensureLoaded(true);
     //#region @browser
     this.cdr?.markForCheck();
     //#endregion
@@ -238,6 +245,10 @@ export class Translation {
 
   //#region private methods / ensure loaded
   private async ensureLoaded(force = false): Promise<void> {
+    if (this.useGlobalLangFile) {
+      this.localFileLang = Translation.manager.currentGlobalLanguage;
+    }
+
     if (!force && this.loadedLang === this.localFileLang) {
       return;
     }
@@ -280,6 +291,7 @@ export class Translation {
 
   //#region private methods / interpolate
   private interpolate(text: string, params?: Record<string, unknown>): string {
+    // console.log(`Interpolate: ${text}, params:${params} localFileLang: ${this.localFileLang}`)
     if (!params) return text;
 
     return text.replace(/\[\[\s*([a-zA-Z0-9_$]+)\s*\]\]/g, (_, key) => {

@@ -5,20 +5,24 @@ import { TranslationManager } from './translation-manager';
 
 @Injectable({ providedIn: 'root' })
 export class TranslateService {
-  private maanger = TranslationManager.Instance;
+  public manager = TranslationManager.Instance;
 
   /**
    * TODO
    */
-  public readonly isLoadingLangs$ = this.maanger.isLoadingLangs$;
+  public readonly isLoadingLangs$ = this.manager.isLoadingLangs$;
 
-  public readonly availableLangs$ = this.maanger.availableLangs$;
+  public readonly availableLangs$ = this.manager.availableLangs$;
 
-  public readonly currentGlobalLanguage$ = this.maanger.currentGlobalLanguage$;
+  public readonly currentGlobalLanguage$ = this.manager.currentGlobalLanguage$;
+
+  public setOneLanguagePernament(lang: UtilsI18n.CommonLocaleCode): void {
+    this.manager.setOneLanguagePernament(lang);
+  }
 
   //#region change global lang
   async changeGlobalLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
-    await this.maanger.changeGlobalLang(lang);
+    await this.manager.changeGlobalLang(lang);
   }
   //#endregion
 }

@@ -1,5 +1,5 @@
 //#region import
-import { BehaviorSubject, tap } from 'rxjs';
+import { BehaviorSubject, filter, map, tap } from 'rxjs';
 import { GlobalStorage, UtilsI18n, _ } from 'tnp-core/src';
 
 import type { Translation } from './translation';
@@ -7,14 +7,41 @@ import type { Translation } from './translation';
 
 //#region constants
 const globalStorageKeyMainLanguage = 'taon-gettext-main-language';
-export const defaultLangLocale: UtilsI18n.CommonLocaleCode = 'en-US';
+const globalTaonLanguageLocalKeyLocalStor = 'taon-language-local';
+
 //#endregion
 
 export class TranslationManager {
   public instances = new Set<Translation>();
 
+  constructor() {
+    // console.log(`[i18] Default lang: ${this.defaultLangLocale}`);
+  }
+
   //#region current global language
-  public currentGlobalLanguage = defaultLangLocale;
+  private defaultLangLocale: UtilsI18n.CommonLocaleCode = (() => {
+    //#region @browser
+    return (
+      (localStorage.getItem(
+        globalTaonLanguageLocalKeyLocalStor,
+      ) as UtilsI18n.CommonLocaleCode) ||
+      (UtilsI18n.detectLocale() as UtilsI18n.CommonLocaleCode)
+    );
+    //#endregion
+    return UtilsI18n.defaultLangLocale;
+  })();
+
+  private _currentGlobalLanguage = this
+    .defaultLangLocale as UtilsI18n.CommonLocaleCode;
+
+  public get currentGlobalLanguage(): UtilsI18n.CommonLocaleCode {
+    return this._currentGlobalLanguage;
+  }
+
+  public set currentGlobalLanguage(v: UtilsI18n.CommonLocaleCode) {
+    this._currentGlobalLanguage = v;
+    this.currentGlobalLanguageSrc.next(v);
+  }
 
   private currentGlobalLanguageSrc = new BehaviorSubject(
     this.currentGlobalLanguage,
@@ -28,7 +55,7 @@ export class TranslationManager {
           globalStorageKeyMainLanguage,
           currentGlobalLanguage,
         );
-        this.currentGlobalLanguage = currentGlobalLanguage;
+        // console.log(`Update from subject ${currentGlobalLanguage}`);
       }),
     );
   //#endregion
@@ -38,19 +65,39 @@ export class TranslationManager {
 
   private availableLangsSrc = new BehaviorSubject(this.availableLangs);
 
-  public readonly availableLangs$ = this.availableLangsSrc
-    .asObservable()
-    .pipe(tap(data => (this.availableLangs = data)));
+  public readonly availableLangs$ = this.availableLangsSrc.asObservable().pipe(
+    map(f => {
+      if (this.visibleLanguages.length > 0) {
+        console.log('Filtering langs')
+        return f.filter(a => this.visibleLanguages.includes(a.code));
+      }
+      return f;
+    }),
+  );
   //#endregion
 
   //#region visible langs
-  public visibleLanguages: UtilsI18n.CommonLocaleCode[] = [];
+  public _visibleLanguages: UtilsI18n.CommonLocaleCode[] = [];
+
+  public get visibleLanguages(): UtilsI18n.CommonLocaleCode[] {
+    return this._visibleLanguages;
+  }
+
+  public set visibleLanguages(v: UtilsI18n.CommonLocaleCode[]) {
+    if (this.pernamentLanguage) {
+      v = v.filter(a =>
+        [this.pernamentLanguage].includes(a),
+      );
+    }
+
+    this._visibleLanguages = v;
+    this.visibleLanguagesSrc.next(v);
+    this.availableLangsSrc.next(this.availableLangs);
+  }
 
   private visibleLanguagesSrc = new BehaviorSubject(this.visibleLanguages);
 
-  public readonly visibleLanguages$ = this.visibleLanguagesSrc
-    .asObservable()
-    .pipe(tap(data => (this.visibleLanguages = data)));
+  public readonly visibleLanguages$ = this.visibleLanguagesSrc.asObservable();
   //#endregion
 
   //#region loading langs subject
@@ -76,31 +123,35 @@ export class TranslationManager {
   }
   //#endregion
 
+  public readonly pernamentLanguage: UtilsI18n.CommonLocaleCode | null = null;
+
+  public setOneLanguagePernament(lang: UtilsI18n.CommonLocaleCode): void {
+    console.info(`Setting pernament language to ${lang}`);
+    if (this.pernamentLanguage) {
+      console.log('You are trying to set again pernament language');
+      return;
+    }
+    this.visibleLanguages = [lang];
+    // @ts-ignore
+    this.pernamentLanguage = lang;
+    void this.changeGlobalLang(lang);
+  }
+
   //#region change global lang
   async changeGlobalLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
     this.loadingLangsSubjectSrc.next(true);
+
+    this.currentGlobalLanguage = lang;
+    localStorage.setItem(globalTaonLanguageLocalKeyLocalStor, lang);
     try {
-      await Promise.all([...this.instances].map(c => c.changeFileLang(lang)));
+      await Promise.all(
+        [...this.instances].map(c => c.useGlobalFileLang(lang)),
+      );
     } catch (error) {
       console.error(error);
     }
     this.loadingLangsSubjectSrc.next(false);
+    // console.info('Done changing language');
   }
-  //#endregion
-
-  //#region get default file lang locale
-  getGlobalFileLang = (): UtilsI18n.CommonLocaleCode => {
-    let mainLocale: UtilsI18n.CommonLocaleCode = GlobalStorage.get(
-      globalStorageKeyMainLanguage,
-    );
-    if (!mainLocale) {
-      GlobalStorage.set<UtilsI18n.CommonLocaleCode>(
-        globalStorageKeyMainLanguage,
-        defaultLangLocale,
-      );
-      mainLocale = defaultLangLocale;
-    }
-    return mainLocale;
-  };
   //#endregion
 }
