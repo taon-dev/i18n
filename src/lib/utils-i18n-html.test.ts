@@ -107,4 +107,100 @@ TRANSLATE PIPIE<br />
       html,
     );
   });
+
+  it('handles @for block with translate directive', () => {
+    const html = `
+@for (item of items; track item.id) {
+  <span translate>Hello</span>
+}
+`;
+
+    expect(
+      UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html),
+    ).toContain(`<span translate [translate-t]="t">`);
+  });
+
+  it('handles @else block with translate directive', () => {
+    const html = `
+@if (ready) {
+  <p>Ready</p>
+} @else {
+  <p translate>Loading</p>
+}
+`;
+
+    expect(
+      UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html),
+    ).toContain(`<p translate [translate-t]="t">`);
+  });
+
+  it('handles nested angular blocks', () => {
+    const html = `
+@if (items.length) {
+  @for (item of items; track item.id) {
+    <h4 translate>{{ item.title }}</h4>
+  }
+}
+`;
+
+    expect(
+      UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html),
+    ).toContain(`<h4 translate [translate-t]="t">`);
+  });
+
+  it('does not duplicate translate-t inside angular block', () => {
+    const html = `
+@if (visible) {
+  <p translate [translate-t]="t">Hello</p>
+}
+`;
+
+    expect(UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html)).toBe(
+      html,
+    );
+  });
+
+  it('handles translate pipe inside @let', () => {
+    const html = `
+@let title = 'Hello' | translate;
+<h1>{{ title }}</h1>
+`;
+
+    expect(
+      UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html),
+    ).toContain(`@let title = 'Hello' | translate:t;`);
+  });
+
+  it('does not touch translate-looking text in normal attributes', () => {
+    const html = `
+<div
+  data-test="translate"
+  aria-label="please translate this"
+  class="translate-x-4">
+</div>
+`;
+
+    expect(UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html)).toBe(
+      html,
+    );
+  });
+
+  it('handles multiple translate directives', () => {
+    const html = `
+<p translate>One</p>
+<span translate>Two</span>
+`;
+
+    const result = UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html);
+
+    expect(result.match(/\[translate-t\]="t"/g)?.length).toBe(2);
+  });
+
+  it('handles translate directive with other attributes after it', () => {
+    const html = `<p translate class="text-lg">Hello</p>`;
+
+    expect(UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(html)).toBe(
+      `<p translate class="text-lg" [translate-t]="t">Hello</p>`,
+    );
+  });
 });

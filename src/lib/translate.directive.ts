@@ -19,6 +19,7 @@ import { Translation } from './translation';
   standalone: true,
 })
 export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
+  private static readonly selector = '[translate]';
   // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('translate-t') t!: Translation;
 
@@ -44,7 +45,7 @@ export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         // this.t.debug && console.log(`Rerender "${this.originalText}"`)
-        this.render()
+        this.render();
       });
   }
 
@@ -58,6 +59,12 @@ export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
 
   private render(): void {
     // console.log('render', this);
+    if (!this.t) {
+      throw (
+        `Directive ${TranslateDirective.selector} applied on component ` +
+        `wihtout implemented Translatable interface`
+      );
+    }
     this.element.nativeElement.textContent = this.t.translate(
       this.originalText,
       this.params,

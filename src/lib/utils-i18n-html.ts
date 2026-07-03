@@ -65,6 +65,12 @@ export namespace UtilsI18nHtml {
         for (const child of node.children ?? []) {
           visit(child);
         }
+
+        for (const branch of node.branches ?? []) {
+          for (const child of branch.children ?? []) {
+            visit(child);
+          }
+        }
       };
 
       for (const node of parsed.nodes) {
