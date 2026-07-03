@@ -42,11 +42,15 @@ export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
     this.render();
     this.t.isLoadingLang$
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.render());
+      .subscribe(() => {
+        // this.t.debug && console.log(`Rerender "${this.originalText}"`)
+        this.render()
+      });
   }
 
   ngOnChanges(): void {
     if (!this.initialized) return;
+    //  this.t.debug && console.log(`On Chnags for "${this.originalText}"`)
     this.render();
   }
 
@@ -59,5 +63,8 @@ export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
       this.params,
       this.translateContext,
     );
+    //#region @browser
+    // this.t.cdr?.markForCheck();
+    //#endregion
   }
 }

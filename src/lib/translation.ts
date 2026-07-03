@@ -27,11 +27,16 @@ export class Translation {
   static for(
     fileRelativePath: string,
     langImportMap: TaonTranslationsMapImport,
+    opt?: {
+      debug?: boolean;
+    },
   ): Translation {
+    opt = opt || {};
     return new Translation(
       fileRelativePath,
       Translation.manager.currentGlobalLanguage,
       langImportMap,
+      !!opt.debug,
     );
   }
   //#endregion
@@ -39,15 +44,15 @@ export class Translation {
   //#region fields
 
   //#region @browser
-  private cdr?: ChangeDetectorRef;
+  public cdr?: ChangeDetectorRef;
 
   //#endregion
 
   private lookup: TranslationLookup = {};
 
-  private readonly loadingSubject = new BehaviorSubject(false);
+  private readonly loadingSubjectSrc = new BehaviorSubject(false);
 
-  public readonly isLoadingLang$ = this.loadingSubject.asObservable();
+  public readonly isLoadingLang$ = this.loadingSubjectSrc.asObservable();
 
   private loading?: Promise<void>;
 
@@ -63,6 +68,7 @@ export class Translation {
     protected fileRelativePath: string,
     protected localFileLang: UtilsI18n.CommonLocaleCode,
     protected langImportMap: TaonTranslationsMapImport,
+    public debug = false,
   ) {
     if (!Translation.manager.instances.has(this)) {
       Translation.manager.instances.add(this);
@@ -118,7 +124,12 @@ export class Translation {
   ): string => {
     const key = this.key(text, context);
     const translated = this.lookup[key] ?? text;
-
+    this.debug &&
+      console.log(
+        `Translate (with load): "${text}" to "${translated}", key="${key}" params:${_.isObject(params) ? JSON.stringify(params) : params} ` +
+          `localFileLang: ${this.localFileLang}`,
+        this,
+      );
     return this.interpolate(translated, params);
   };
   //#endregion
@@ -201,13 +212,19 @@ export class Translation {
   ): string {
     const key = this.key(text, context);
     const translated = this.lookup[key] ?? text;
+    this.debug &&
+      console.log(
+        `Translate (no load): "${text}" to "${translated}", key="${key}" params:${_.isObject(params) ? JSON.stringify(params) : params} ` +
+          `localFileLang: ${this.localFileLang}`,
+        this,
+      );
     return this.interpolate(translated, params);
   }
   //#endregion
 
   //#region private methods / load
   private async load(): Promise<void> {
-    this.loadingSubject.next(true);
+    this.loadingSubjectSrc.next(true);
 
     const files: UtilsI18n.GettextFile[] = [];
     const filesForTArr = Object.keys(this.langImportMap);
@@ -233,13 +250,14 @@ export class Translation {
     }
     this.loadedLang = this.localFileLang;
     this.lookup = this.createLookup(files);
+    this.debug && console.log(`${this.localFileLang}`, files, this.lookup);
 
     this.refreshBindings();
 
     //#region @browser
     this.cdr?.markForCheck();
     //#endregion
-    this.loadingSubject.next(false);
+    this.loadingSubjectSrc.next(false);
   }
   //#endregion
 
@@ -291,13 +309,14 @@ export class Translation {
 
   //#region private methods / interpolate
   private interpolate(text: string, params?: Record<string, unknown>): string {
-    // console.log(`Interpolate: ${text}, params:${params} localFileLang: ${this.localFileLang}`)
     if (!params) return text;
 
-    return text.replace(/\[\[\s*([a-zA-Z0-9_$]+)\s*\]\]/g, (_, key) => {
+    const result = text.replace(/\[\[\s*([a-zA-Z0-9_$]+)\s*\]\]/g, (_, key) => {
       const value = params[key];
       return value === undefined || value === null ? '' : String(value);
     });
+
+    return result;
   }
   //#endregion
 }

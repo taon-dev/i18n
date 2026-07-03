@@ -11,5 +11,6 @@ export * from './translate.service'; // @browser
 export * from './translation-manager'; 
 export * from './translation.models'; 
 export * from './translation'; 
+export * from './utils-i18n-extract-gettext-translate-from-html'; 
 export * from './utils-i18n-html'; 
 export * from './utils-po-file'; 
