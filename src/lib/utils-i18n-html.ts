@@ -32,11 +32,14 @@ export namespace UtilsI18nHtml {
   export function replaceTranslatePipieDirectiveTContext(html: string): string {
     //#region @backendFunc
     const edits: Array<{ index: number; text: string }> = [];
+    let parsedSuccessfully = false;
 
     try {
       const parsed = parseTemplate(html, 'template.html', {
         preserveWhitespaces: true,
       });
+
+      parsedSuccessfully = true;
 
       const visit = (node: any): void => {
         if (hasTranslateDirective(node) && !hasTranslateTInput(node)) {
@@ -71,7 +74,7 @@ export namespace UtilsI18nHtml {
       // fallback below
     }
 
-    if (edits.length === 0) {
+    if (!parsedSuccessfully) {
       edits.push(...findTranslateDirectiveEditsFromSource(html));
     }
 
@@ -92,7 +95,8 @@ export namespace UtilsI18nHtml {
     //#region @backendFunc
     const edits: Array<{ index: number; text: string }> = [];
 
-    const tagRegex = /<([a-zA-Z0-9-]+)\b[^>]*\btranslate\b[^>]*>/g;
+    const tagRegex =
+      /<([a-zA-Z0-9-]+)\b(?=[^>]*(?:\s|^|<)translate(?:\s|=|>|\/))[^>]*>/g;
 
     for (const match of html.matchAll(tagRegex)) {
       const tag = match[0];
