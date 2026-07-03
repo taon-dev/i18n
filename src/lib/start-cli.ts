@@ -1,15 +1,15 @@
 //#region tnp-helpers cli template
-import { CoreModels } from 'tnp-core/src';
-import { Helpers, BaseCommandLineFeature } from 'tnp-helpers/src';
-import { BaseProject, BaseStartConfig } from 'tnp-helpers/src'; // @backend
+// import { CoreModels } from 'tnp-core/src';
+// import { Helpers, BaseCommandLineFeature } from 'tnp-helpers/src';
+// import { BaseProject, BaseStartConfig } from 'tnp-helpers/src'; // @backend
 
-class $Global extends BaseCommandLineFeature<{}> {
-  static [CoreModels.ClassNameStaticProperty] = '';
-  public _() {
-    console.log(`Hello world from cli`);
-    this._exit();
-  }
-}
+// class $Global extends BaseCommandLineFeature<{}> {
+//   static [CoreModels.ClassNameStaticProperty] = '';
+//   public _() {
+//     console.log(`Hello world from cli`);
+//     this._exit();
+//   }
+// }
 //#endregion
 
 /**
@@ -27,23 +27,23 @@ export async function startCli(
   // process.exit(0);
 
   //#region start config
-  new BaseStartConfig({
-    ProjectClass: BaseProject,
-    functionsOrClasses: [
-      {
-        classOrFnName: '$Version',
-        funcOrClass: $Global,
-      },
-    ],
-    argsv,
-    useStringArrForArgsFunctions: true,
-    shortArgsReplaceConfig: {
-      v: 'version',
-    },
-    callbackNotRecognizedCommand: async () => {
-      Helpers.error(`Command not recognized`, false, true);
-    },
-  });
+  // new BaseStartConfig({
+  //   ProjectClass: BaseProject,
+  //   functionsOrClasses: [
+  //     {
+  //       classOrFnName: '$Version',
+  //       funcOrClass: $Global,
+  //     },
+  //   ],
+  //   argsv,
+  //   useStringArrForArgsFunctions: true,
+  //   shortArgsReplaceConfig: {
+  //     v: 'version',
+  //   },
+  //   callbackNotRecognizedCommand: async () => {
+  //     Helpers.error(`Command not recognized`, false, true);
+  //   },
+  // });
   //#endregion
   //#endregion
 }
