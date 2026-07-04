@@ -203,4 +203,47 @@ TRANSLATE PIPIE<br />
       `<p translate class="text-lg" [translate-t]="t">Hello</p>`,
     );
   });
+
+  const htmlAngularInlineComponent = `
+ import { Component, OnInit } from "@angular/core";
+import { Translation } from "@taon-dev/i18n/src";
+import { Taon } from "taon/src";
+const t = Translation.for(Taon.__FILE_RELATIVE_PATH, Taon.LANG_IMPORT_MAP);
+
+@Component({
+  selector: "selector-name",
+  template: \`
+    <mat-card-content>
+      <h3 translate>Example hello world from backend API:</h3>
+      {{ t.gettext("hello world from backend:") }}
+      <strong>{{ hello$ | async }}</strong>
+    </mat-card-content>
+  \`,
+})
+export class NameComponent {
+    t = t.for(this);
+    signalText = this.t.signal.gettext('hello',null,'helo from component');
+
+}
+
+`;
+
+  it('handle inline components template when explicite ', () => {
+    const changed = UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(
+      htmlAngularInlineComponent,
+      {
+        angularTsWithInlineHtml: true,
+      },
+    );
+    // console.log({ changed });
+    expect(changed).to.includes(`translate [translate-t]="t"`);
+  });
+
+  it('handle inline components template when detection ', () => {
+    const changed = UtilsI18nHtml.replaceTranslatePipieDirectiveTContext(
+      htmlAngularInlineComponent,
+    );
+    // console.log({ changed });
+    expect(changed).to.includes(`translate [translate-t]="t"`);
+  });
 });

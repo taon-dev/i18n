@@ -15,6 +15,24 @@ import {
   TmplAstText,
 } from '@angular/compiler';
 import { UtilsI18n } from 'tnp-core/src';
+import {
+  canHaveDecorators,
+  ClassDeclaration,
+  createSourceFile,
+  Decorator,
+  Expression,
+  forEachChild,
+  getDecorators,
+  isCallExpression,
+  isClassDeclaration,
+  isIdentifier,
+  isObjectLiteralExpression,
+  isPropertyAssignment,
+  Node,
+  ScriptKind,
+  ScriptTarget,
+} from 'typescript';
+
 import { UtilsI18nExtractGettextTranslateFromHtml } from './utils-i18n-extract-gettext-translate-from-html';
 //#endregion
 
@@ -29,7 +47,204 @@ export namespace UtilsI18nHtml {
     );
   }
 
-  export function replaceTranslatePipieDirectiveTContext(html: string): string {
+  export function replaceTranslatePipieDirectiveTContext(
+    html: string,
+    options?: {
+      angularTsWithInlineHtml?: boolean;
+    },
+  ): string {
+    //#region @backendFunc
+    if (options?.angularTsWithInlineHtml || isAngularTsWithInlineHtml(html)) {
+      return replaceInAngularInlineTemplates(html);
+    }
+
+    return replaceTranslatePipieDirectiveTContextInHtml(html);
+    //#endregion
+  }
+
+  export function isAngularTsWithInlineHtml(content: string): boolean {
+    //#region @backendFunc
+    if (
+      !content ||
+      !content.includes('@Component(') ||
+      !content.includes('template')
+    ) {
+      return false;
+    }
+
+    return getAngularInlineTemplateRanges(content).length > 0;
+    //#endregion
+  }
+
+  function replaceInAngularInlineTemplates(content: string): string {
+    //#region @backendFunc
+    const ranges = getAngularInlineTemplateRanges(content);
+
+    const edits = ranges.map(range => {
+      let changed = replaceTranslatePipieDirectiveTContextInHtml(range.html);
+
+      // double-quoted TS string: template: "<h3 translate></h3>"
+      // avoid breaking TS string by using single quotes in Angular binding
+      if (range.quote === '"') {
+        changed = changed.replaceAll(`[translate-t]="t"`, `[translate-t]='t'`);
+      }
+
+      return {
+        index: range.start,
+        end: range.end,
+        text: changed,
+      };
+    });
+
+    return edits
+      .sort((a, b) => b.index - a.index)
+      .reduce((acc, edit) => {
+        return acc.slice(0, edit.index) + edit.text + acc.slice(edit.end);
+      }, content);
+    //#endregion
+  }
+
+  function getAngularInlineTemplateRanges(content: string): Array<{
+    start: number;
+    end: number;
+    html: string;
+    quote: '`' | '"' | "'";
+  }> {
+    //#region @backendFunc
+    const sourceFile = createSourceFile(
+      'inline-component.ts',
+      content,
+      ScriptTarget.Latest,
+      true,
+      ScriptKind.TS,
+    );
+
+    const ranges: Array<{
+      start: number;
+      end: number;
+      html: string;
+      quote: '`' | '"' | "'";
+    }> = [];
+
+    const visit = (node: Node): void => {
+      if (isClassDeclaration(node) && hasComponentDecorator(node)) {
+        const decorator = getComponentDecorator(node);
+
+        if (decorator) {
+          const templateInitializer =
+            getComponentTemplateInitializer(decorator);
+
+          if (templateInitializer) {
+            const range = getStringLikeInnerRange(content, templateInitializer);
+
+            if (range) {
+              ranges.push(range);
+            }
+          }
+        }
+      }
+
+      forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
+
+    return ranges;
+    //#endregion
+  }
+
+  function hasComponentDecorator(node: ClassDeclaration): boolean {
+    //#region @backendFunc
+    return !!getComponentDecorator(node);
+    //#endregion
+  }
+
+  function getComponentDecorator(
+    node: ClassDeclaration,
+  ): Decorator | undefined {
+    //#region @backendFunc
+    const decorators = canHaveDecorators(node)
+      ? getDecorators(node)
+      : undefined;
+
+    return decorators?.find(decorator => {
+      const expression = decorator.expression;
+
+      return (
+        isCallExpression(expression) &&
+        isIdentifier(expression.expression) &&
+        expression.expression.text === 'Component'
+      );
+    });
+    //#endregion
+  }
+
+  function getComponentTemplateInitializer(
+    decorator: Decorator,
+  ): Expression | undefined {
+    //#region @backendFunc
+    const expression = decorator.expression;
+
+    if (!isCallExpression(expression)) {
+      return;
+    }
+
+    const firstArg = expression.arguments[0];
+
+    if (!firstArg || !isObjectLiteralExpression(firstArg)) {
+      return;
+    }
+
+    const templateProperty = firstArg.properties.find(prop => {
+      return (
+        isPropertyAssignment(prop) &&
+        isIdentifier(prop.name) &&
+        prop.name.text === 'template'
+      );
+    });
+
+    if (!templateProperty || !isPropertyAssignment(templateProperty)) {
+      return;
+    }
+
+    return templateProperty.initializer;
+    //#endregion
+  }
+
+  function getStringLikeInnerRange(
+    content: string,
+    node: Expression,
+  ):
+    | {
+        start: number;
+        end: number;
+        html: string;
+        quote: '`' | '"' | "'";
+      }
+    | undefined {
+    //#region @backendFunc
+    const fullText = node.getText();
+    const start = node.getStart();
+    const quote = fullText[0] as '`' | '"' | "'";
+
+    if (quote !== '`' && quote !== '"' && quote !== "'") {
+      return;
+    }
+
+    const end = node.getEnd();
+
+    return {
+      start: start + 1,
+      end: end - 1,
+      html: content.slice(start + 1, end - 1),
+      quote,
+    };
+    //#endregion
+  }
+
+  export function replaceTranslatePipieDirectiveTContextInHtml(
+    html: string,
+  ): string {
     //#region @backendFunc
     const edits: Array<{ index: number; text: string }> = [];
     let parsedSuccessfully = false;
