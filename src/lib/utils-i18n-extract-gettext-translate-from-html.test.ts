@@ -330,6 +330,50 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
     );
   });
 
+  it('should from angular inline component template', () => {
+    const html = `
+ import { Component, OnInit } from "@angular/core";
+import { Translation } from "@taon-dev/i18n/src";
+import { Taon } from "taon/src";
+const t = Translation.for(Taon.__FILE_RELATIVE_PATH, Taon.LANG_IMPORT_MAP);
+
+@Component({
+  selector: "selector-name",
+  template: \`
+    <mat-card-content>
+      <h3 translate>Example hello world from backend API:</h3>
+      {{ t.gettext("hello world from backend:") }}
+      <strong>{{ hello$ | async }}</strong>
+    </mat-card-content>
+  \`,
+})
+export class NameComponent {
+    t = t.for(this);
+    signalText = this.t.signal.gettext('hello',null,'helo from component');
+
+}
+
+`;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 11,
+        gettextString: 'Example hello world from backend API:',
+        context: undefined,
+      },
+      {
+        lineNumber: 12,
+        gettextString: 'hello world from backend:',
+        context: undefined,
+      },
+      {
+        lineNumber: 19,
+        gettextString: 'hello',
+        context: 'helo from component',
+      },
+    ]);
+  });
+
   // it('skips gettext with template interpolation', () => {
   //   const html = `
   //     <span>{{ t.gettext(\`Hello \${name}\`) }}</span>
