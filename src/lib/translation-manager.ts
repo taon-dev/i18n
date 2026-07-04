@@ -142,7 +142,9 @@ export class TranslationManager {
     this.loadingLangsSubjectSrc.next(true);
 
     this.currentGlobalLanguage = lang;
+    //#region @browser
     localStorage.setItem(globalTaonLanguageLocalKeyLocalStor, lang);
+    //#endregion
     try {
       await Promise.all(
         [...this.instances].map(c => c.useGlobalFileLang(lang)),

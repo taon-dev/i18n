@@ -7,15 +7,6 @@ import { TranslationManager } from './translation-manager';
 export class TranslateService {
   public manager = TranslationManager.Instance;
 
-  /**
-   * TODO
-   */
-  public readonly isLoadingLangs$ = this.manager.isLoadingLangs$;
-
-  public readonly availableLangs$ = this.manager.availableLangs$;
-
-  public readonly currentGlobalLanguage$ = this.manager.currentGlobalLanguage$;
-
   public setOneLanguagePernament(lang: UtilsI18n.CommonLocaleCode): void {
     this.manager.setOneLanguagePernament(lang);
   }
