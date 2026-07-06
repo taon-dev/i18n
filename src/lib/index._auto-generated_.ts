@@ -14,3 +14,4 @@ export * from './translation';
 export * from './utils-i18n-extract-gettext-translate-from-html'; 
 export * from './utils-i18n-html'; 
 export * from './utils-po-file'; 
+export * from './i18n/lib.translation'; 

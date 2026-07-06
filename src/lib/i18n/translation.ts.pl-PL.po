@@ -1,0 +1,17 @@
+msgid ""
+msgstr ""
+"Language: pl-PL\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/lib/translation.ts:330
+msgid "asdasd"
+msgstr ""
+
+#: src/lib/translation.ts:340
+msgid "amazing better place"
+msgstr ""
+
+#: src/lib/translation.ts:354
+msgid "hello"
+msgstr ""
