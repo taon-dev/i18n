@@ -4,14 +4,14 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/lib/translation.ts:330
+#: src/lib/translation.ts:336
 msgid "asdasd"
 msgstr ""
 
-#: src/lib/translation.ts:340
+#: src/lib/translation.ts:346
 msgid "amazing better place"
 msgstr ""
 
-#: src/lib/translation.ts:354
+#: src/lib/translation.ts:360
 msgid "hello"
 msgstr ""

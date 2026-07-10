@@ -13,7 +13,7 @@ import {
   TmplAstNode,
   TmplAstTemplate,
   TmplAstText,
-} from '@angular/compiler';
+} from '@angular/compiler/cjs';
 import { UtilsI18n } from 'tnp-core/src';
 import {
   canHaveDecorators,

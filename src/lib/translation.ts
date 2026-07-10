@@ -4,6 +4,9 @@ import {
   inject,
   signal,
   WritableSignal,
+} from '@angular/core'; // @browser
+import type {
+  WritableSignal as WritableSignalType,
 } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { GlobalStorage, UtilsI18n, _ } from 'tnp-core/src';
@@ -78,11 +81,11 @@ export class Translation {
 
   //#region for
   for(_classThis: object): Translation {
-    //#region @browser
     if (this.useGlobalFileLang) {
       this.localFileLang = Translation.manager.currentGlobalLanguage;
       // console.log(`Update on t.for() ${this.localFileLang}`)
     }
+    //#region @browser
     try {
       this.cdr = inject(ChangeDetectorRef);
     } catch {
@@ -140,7 +143,8 @@ export class Translation {
     text: string,
     params?: TranslationParams,
     context = '',
-  ): WritableSignal<string> {
+  ): WritableSignalType<string> {
+    //#region @browser
     const s = signal<string>(this.gettext(text, params, context));
 
     this.bindings.add({
@@ -151,6 +155,8 @@ export class Translation {
     });
 
     return s;
+    //#endregion
+    return void 0;
   }
 
   readonly signal = {
