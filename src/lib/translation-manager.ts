@@ -8,11 +8,28 @@ import type { Translation } from './translation';
 //#region constants
 const globalStorageKeyMainLanguage = 'taon-gettext-main-language';
 const globalTaonLanguageLocalKeyLocalStor = 'taon-language-local';
-
+const TranslationManagerGlobalStorKey = 'TranslationManagerGlobalStorKey';
 //#endregion
 
 export class TranslationManager {
-  public instances = new Set<Translation>();
+  static globalDefautlLanguageOverride: UtilsI18n.CommonLocaleCode;
+
+  // public instances = new Set<Translation>();
+  public get instances(): Set<Translation> {
+    let set = GlobalStorage.get(
+      TranslationManagerGlobalStorKey,
+    ) as Set<Translation>;
+    if (_.isNil(set)) {
+      GlobalStorage.set(
+        TranslationManagerGlobalStorKey,
+        new Set<Translation>(),
+      );
+    }
+    set = GlobalStorage.get(
+      TranslationManagerGlobalStorKey,
+    ) as Set<Translation>;
+    return set;
+  }
 
   constructor() {
     // console.log(`[i18] Default lang: ${this.defaultLangLocale}`);
@@ -25,6 +42,7 @@ export class TranslationManager {
       (localStorage.getItem(
         globalTaonLanguageLocalKeyLocalStor,
       ) as UtilsI18n.CommonLocaleCode) ||
+      TranslationManager.globalDefautlLanguageOverride ||
       (UtilsI18n.detectLocale() as UtilsI18n.CommonLocaleCode)
     );
     //#endregion
@@ -85,9 +103,7 @@ export class TranslationManager {
 
   public set visibleLanguages(v: UtilsI18n.CommonLocaleCode[]) {
     if (this.pernamentLanguage) {
-      v = v.filter(a =>
-        [this.pernamentLanguage].includes(a),
-      );
+      v = v.filter(a => [this.pernamentLanguage].includes(a));
     }
 
     this._visibleLanguages = v;
@@ -145,10 +161,9 @@ export class TranslationManager {
     //#region @browser
     localStorage.setItem(globalTaonLanguageLocalKeyLocalStor, lang);
     //#endregion
+    // console.log('instances ', this.instances);
     try {
-      await Promise.all(
-        [...this.instances].map(c => c.useGlobalFileLang(lang)),
-      );
+      await Promise.all([...this.instances].map(c => c.useGlobalFileLang()));
     } catch (error) {
       console.error(error);
     }

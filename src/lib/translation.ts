@@ -73,15 +73,20 @@ export class Translation {
     protected langImportMap: TaonTranslationsMapImport,
     public debug = false,
   ) {
+
     if (!Translation.manager.instances.has(this)) {
+      // console.log(`Adding for ${fileRelativePath} `)
       Translation.manager.instances.add(this);
+    } else {
+      // console.log(`NOT ADDING for ${fileRelativePath} `)
     }
+    // console.log(...Translation.manager.instances)
   }
   //#endregion
 
   //#region for
   for(_classThis: object): Translation {
-    if (this.useGlobalFileLang) {
+    if (this.useGlobalLangFile) {
       this.localFileLang = Translation.manager.currentGlobalLanguage;
       // console.log(`Update on t.for() ${this.localFileLang}`)
     }
@@ -110,7 +115,7 @@ export class Translation {
   //#endregion
 
   //#region use global file lang
-  async useGlobalFileLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
+  async useGlobalFileLang( ): Promise<void> {
     this.useGlobalLangFile = true;
     await this.ensureLoaded(true);
     //#region @browser
