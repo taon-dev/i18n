@@ -1,50 +1,18 @@
-//#region tnp-helpers cli template
-// import { CoreModels } from 'tnp-core/src';
-// import { Helpers, BaseCommandLineFeature } from 'tnp-helpers/src';
-// import { BaseProject, BaseStartConfig } from 'tnp-helpers/src'; // @backend
+import { LocalTranslationService } from './local-translation';
 
-// class $Global extends BaseCommandLineFeature<{}> {
-//   static [CoreModels.ClassNameStaticProperty] = '';
-//   public _() {
-//     console.log(`Hello world from cli`);
-//     this._exit();
-//   }
-// }
-//#endregion
-
-/**
- *
- * @param argsv process.argsv
- * @param filename needed if you want ipc communicaiton
- */
 export async function startCli(
   argsv: string[],
   filename: string,
 ): Promise<void> {
   //#region @backendFunc
-  console.log('Hello from cli');
-  // console.log({ argsv });
-  // process.exit(0);
-
-  //#region start config
-  // new BaseStartConfig({
-  //   ProjectClass: BaseProject,
-  //   functionsOrClasses: [
-  //     {
-  //       classOrFnName: '$Version',
-  //       funcOrClass: $Global,
-  //     },
-  //   ],
-  //   argsv,
-  //   useStringArrForArgsFunctions: true,
-  //   shortArgsReplaceConfig: {
-  //     v: 'version',
-  //   },
-  //   callbackNotRecognizedCommand: async () => {
-  //     Helpers.error(`Command not recognized`, false, true);
-  //   },
-  // });
-  //#endregion
+  const s = new LocalTranslationService();
+  const result = await s.translate({
+    from: 'en-US',
+    to: 'de-DE',
+    text: argsv.slice(2).join(' '),
+  });
+  console.log(`Translated: ${result}`);
+  process.exit(0);
   //#endregion
 }
 

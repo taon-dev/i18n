@@ -79,7 +79,9 @@ export namespace UtilsPoFile {
       }
 
       lines.push(`msgid "${escapePoString(entry.msgid)}"`);
-      lines.push(`msgstr "${entry.translation || ''}"`);
+      lines.push(
+        `msgstr "${escapePoString(normalizePoTranslation(entry.translation) ?? '')}"`,
+      );
       lines.push('');
     }
 
@@ -89,25 +91,36 @@ export namespace UtilsPoFile {
   //#endregion
 
   //#region extract po to json
-  export function extractPoToJson(poFileContent: string): UtilsI18n.GettextFile[] {
+  export function extractPoToJson(
+    poFileContent: string,
+  ): UtilsI18n.GettextFile[] {
     //#region @backendFunc
     const entries = parsePoEntries(poFileContent);
     const filesMap = new Map<string, UtilsI18n.GettextFile>();
 
     for (const entry of entries) {
-      if (!entry.msgid) continue;
+      if (!entry.msgid) {
+        continue;
+      }
+
+      const translation = normalizePoTranslation(entry.msgstr);
 
       for (const ref of entry.refs) {
         const parsedRef = parsePoRef(ref);
-        if (!parsedRef) continue;
+
+        if (!parsedRef) {
+          continue;
+        }
 
         let file = filesMap.get(parsedRef.fileAbsPath);
 
         if (!file) {
           file = {
             fileAbsPath: parsedRef.fileAbsPath,
+            fileRelativePath: parsedRef.fileAbsPath,
             tags: [],
           };
+
           filesMap.set(parsedRef.fileAbsPath, file);
         }
 
@@ -115,7 +128,7 @@ export namespace UtilsPoFile {
           lineNumber: parsedRef.lineNumber,
           gettextString: entry.msgid,
           context: entry.msgctxt,
-          translation: entry.msgstr || undefined,
+          translation,
         });
       }
     }
@@ -194,13 +207,13 @@ export namespace UtilsPoFile {
       fileAbsPath: jsonContent1FromTsHtml.fileAbsPath,
       fileRelativePath: jsonContent1FromTsHtml.fileRelativePath,
       isAppFile: jsonContent1FromTsHtml.isAppFile,
+
       tags: jsonContent1FromTsHtml.tags.map(sourceTag => {
         const oldTag = oldTagsByKey.get(getGettextTagKey(sourceTag));
 
         return {
           ...sourceTag,
-          lineNumber: sourceTag.lineNumber,
-          translation: oldTag?.translation || undefined,
+          translation: normalizePoTranslation(oldTag?.translation),
         };
       }),
     };
@@ -215,7 +228,6 @@ export namespace UtilsPoFile {
     return `${tag.context ?? ''}\u0004${tag.gettextString}`;
   }
 
-
   interface ParsedPoEntry {
     refs: string[];
     msgctxt?: string;
@@ -225,7 +237,9 @@ export namespace UtilsPoFile {
 
   function parsePoEntries(po: string): ParsedPoEntry[] {
     //#region @backendFunc
-    const lines = po.split(/\r?\n/);
+    const normalizedPo = po.replace(/^\uFEFF/, '');
+    const lines = normalizedPo.split(/\r?\n/);
+
     const entries: ParsedPoEntry[] = [];
 
     let current: ParsedPoEntry = { refs: [] };
@@ -233,7 +247,7 @@ export namespace UtilsPoFile {
 
     const flush = () => {
       if (
-        current.refs.length ||
+        current.refs.length > 0 ||
         current.msgctxt !== undefined ||
         current.msgid !== undefined ||
         current.msgstr !== undefined
@@ -285,8 +299,10 @@ export namespace UtilsPoFile {
 
     flush();
 
-    // skip header
-    return entries.filter(entry => !(entry.msgid === '' && !entry.refs.length));
+    return entries.filter(entry => {
+      const isHeader = entry.msgid === '' && entry.refs.length === 0;
+      return !isHeader;
+    });
     //#endregion
   }
 
@@ -294,12 +310,15 @@ export namespace UtilsPoFile {
     ref: string,
   ): { fileAbsPath: string; lineNumber: number } | null {
     //#region @backendFunc
-    const match = ref.match(/^(.+):(\d+)$/);
-    if (!match) return null;
+    const match = ref.match(/^(.+?)(?::(\d+))?$/);
+
+    if (!match) {
+      return null;
+    }
 
     return {
       fileAbsPath: match[1],
-      lineNumber: Number(match[2]),
+      lineNumber: match[2] ? Number(match[2]) : 0,
     };
     //#endregion
   }
@@ -316,6 +335,16 @@ export namespace UtilsPoFile {
     if (!match) return '';
 
     return unescapePoString(match[1]);
+  }
+
+  function normalizePoTranslation(
+    translation?: string | null,
+  ): string | undefined {
+    if (translation === undefined || translation === null) {
+      return undefined;
+    }
+
+    return translation.trim().length > 0 ? translation : undefined;
   }
 
   function unescapePoString(value: string): string {

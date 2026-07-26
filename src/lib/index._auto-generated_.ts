@@ -4,6 +4,7 @@
 // set property "shouldGenerateAutogenIndexFile: false" 
 // in taon.jsonc of your project. 
 export * from './build-info._auto-generated_'; 
+export * from './local-translation'; 
 export * from './start-cli'; 
 export * from './translate.directive'; // @browser
 export * from './translate.pipe'; // @browser

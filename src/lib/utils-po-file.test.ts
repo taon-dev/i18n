@@ -27,6 +27,7 @@ msgstr "Kupiłeś [[ howMany ]] produktów"
     expect(UtilsPoFile.extractPoToJson(po)).toEqual([
       {
         fileAbsPath: 'src/lib/test.html',
+        fileRelativePath: 'src/lib/test.html',
         tags: [
           {
             lineNumber: 8,
@@ -61,6 +62,7 @@ msgstr ""
     expect(UtilsPoFile.extractPoToJson(po)).toEqual([
       {
         fileAbsPath: 'src/lib/test.html',
+        fileRelativePath: 'src/lib/test.html',
         tags: [
           {
             lineNumber: 1,
