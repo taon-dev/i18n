@@ -1,11 +1,10 @@
-import { mkdirSync } from 'node:fs';
-
 import {
   crossPlatformPath,
   dotTaonFolder,
   UtilsI18n,
   UtilsOs,
   _,
+  Helpers,
 } from 'tnp-core/src';
 
 export interface TranslationOptions {
@@ -299,9 +298,7 @@ export class LocalTranslationService {
       'ai-models-cache',
     ]);
 
-    mkdirSync(cachePath, {
-      recursive: true,
-    });
+    Helpers.mkdirp(cachePath);
 
     return cachePath;
   }
