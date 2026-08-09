@@ -13,7 +13,7 @@ import {
   TmplAstNode,
   TmplAstTemplate,
   TmplAstText,
-} from '@angular/compiler/cjs';
+} from '@angular/compiler/cjs'; // @esmRemove
 import { UtilsI18n } from 'tnp-core/src';
 //#endregion
 
@@ -23,6 +23,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     fileName = 'template.html',
   ): UtilsI18n.GettextExtracted[] {
     //#region @backendFunc
+    //#region @esmRemove
     const parsed = parseTemplate(html, fileName, {
       preserveWhitespaces: true,
     });
@@ -116,6 +117,8 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
 
     return uniqueMessages(messages);
     //#endregion
+    //#endregion
+    return void 0 as any;
   }
 
   function extractGettextCallsFromSource(
@@ -402,6 +405,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     //#endregion
   }
 
+  //#region @esmRemove
   function getNodeInputs(node: any): TmplAstBoundAttribute[] {
     //#region @backendFunc
     return [
@@ -410,6 +414,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     ];
     //#endregion
   }
+  //#endregion
 
   function isText(node: any): boolean {
     //#region @backendFunc
@@ -489,6 +494,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     //#endregion
   }
 
+  //#region @esmRemove
   function extractTranslateParams(
     inputs: TmplAstBoundAttribute[],
   ): Record<string, string> | null {
@@ -502,6 +508,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     return extractObjectLiteralFromAst(input.value);
     //#endregion
   }
+  //#endregion
 
   function extractObjectLiteralFromAst(
     ast: any,
@@ -524,6 +531,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     //#endregion
   }
 
+  //#region @esmRemove
   function extractTranslatePipeStrings(ast: AST | any): string[] {
     //#region @backendFunc
     const result: string[] = [];
@@ -553,6 +561,7 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     return result;
     //#endregion
   }
+  //#endregion
 
   function extractStaticStringsFromExpression(ast: any): string[] {
     //#region @backendFunc

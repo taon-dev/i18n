@@ -138,6 +138,7 @@ export class LocalTranslationService {
 
   private async createTranslator(): Promise<any> {
     //#region @backendFunc
+    //#region @esmRemove
     const { env, pipeline } = await import(
       '@huggingface/transformers'
     );
@@ -161,6 +162,8 @@ export class LocalTranslationService {
 
     return translator;
     //#endregion
+    //#endregion
+    return void 0 as any;
   }
 
   private emitProgress(progress: AiDownloadProgress): void {

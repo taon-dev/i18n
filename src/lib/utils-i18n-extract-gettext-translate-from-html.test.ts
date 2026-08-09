@@ -1,3 +1,4 @@
+
 import { UtilsI18nHtml } from './utils-i18n-html';
 
 describe('UtilsI18nHtml.extractFromHtml', () => {

@@ -13,7 +13,7 @@ import {
   TmplAstNode,
   TmplAstTemplate,
   TmplAstText,
-} from '@angular/compiler/cjs';
+} from '@angular/compiler/cjs'; // @esmRemove
 import { UtilsI18n } from 'tnp-core/src';
 import {
   canHaveDecorators,
@@ -31,7 +31,7 @@ import {
   Node,
   ScriptKind,
   ScriptTarget,
-} from 'typescript';
+} from 'typescript'; // @esmRemove
 
 import { UtilsI18nExtractGettextTranslateFromHtml } from './utils-i18n-extract-gettext-translate-from-html';
 //#endregion
@@ -54,16 +54,20 @@ export namespace UtilsI18nHtml {
     },
   ): string {
     //#region @backendFunc
+    //#region @esmRemove
     if (options?.angularTsWithInlineHtml || isAngularTsWithInlineHtml(html)) {
       return replaceInAngularInlineTemplates(html);
     }
 
     return replaceTranslatePipieDirectiveTContextInHtml(html);
     //#endregion
+    //#endregion
+    return void 0 as any;
   }
 
   export function isAngularTsWithInlineHtml(content: string): boolean {
     //#region @backendFunc
+    //#region @esmRemove
     if (
       !content ||
       !content.includes('@Component(') ||
@@ -74,7 +78,11 @@ export namespace UtilsI18nHtml {
 
     return getAngularInlineTemplateRanges(content).length > 0;
     //#endregion
+    //#endregion
+    return void 0 as any;
   }
+
+  //#region @esmRemove
 
   function replaceInAngularInlineTemplates(content: string): string {
     //#region @backendFunc
@@ -241,11 +249,13 @@ export namespace UtilsI18nHtml {
     };
     //#endregion
   }
+  //#endregion
 
   export function replaceTranslatePipieDirectiveTContextInHtml(
     html: string,
   ): string {
     //#region @backendFunc
+    //#region @esmRemove
     const edits: Array<{ index: number; text: string }> = [];
     let parsedSuccessfully = false;
 
@@ -308,6 +318,8 @@ export namespace UtilsI18nHtml {
 
     return result;
     //#endregion
+    //#endregion
+    return void 0 as any;
   }
 
   function findTranslateDirectiveEditsFromSource(

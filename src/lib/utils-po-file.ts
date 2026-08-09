@@ -1,7 +1,4 @@
-import { mkdirSync, writeFileSync } from 'fs'; // @backend
-import { join } from 'path';
-
-import { UtilsI18n } from 'tnp-core/src';
+import { crossPlatformPath, UtilsI18n, fse } from 'tnp-core/src';
 
 export namespace UtilsPoFile {
   //#region generate po files
@@ -11,13 +8,13 @@ export namespace UtilsPoFile {
     destinationAbsFolderPath: string,
   ): void {
     //#region @backendFunc
-    mkdirSync(destinationAbsFolderPath, { recursive: true });
+    fse.mkdirSync(destinationAbsFolderPath, { recursive: true });
 
     for (const locale of locales) {
       const poContent = generatePoFileContent(files, locale);
-      const poFilePath = join(destinationAbsFolderPath, `${locale}.po`);
+      const poFilePath = crossPlatformPath([destinationAbsFolderPath, `${locale}.po`]);
 
-      writeFileSync(poFilePath, poContent, 'utf8');
+      fse.writeFileSync(poFilePath, poContent, 'utf8');
     }
     //#endregion
   }
