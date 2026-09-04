@@ -1,25 +1,24 @@
 import {
+  AfterViewInit,
   DestroyRef,
   Directive,
   ElementRef,
   inject,
   Input,
-  OnDestroy,
-  OnInit,
   OnChanges,
 } from '@angular/core';
 // @ts-ignore
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { TranslateService } from './translate.service';
 import { Translation } from './translation';
 
 @Directive({
   selector: '[translate]',
   standalone: true,
 })
-export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
+export class TranslateDirective implements AfterViewInit, OnChanges {
   private static readonly selector = '[translate]';
+
   // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('translate-t') t!: Translation;
 
@@ -32,46 +31,62 @@ export class TranslateDirective implements OnInit, OnDestroy, OnChanges {
   private initialized = false;
 
   private readonly element = inject(ElementRef<HTMLElement>);
-
   private readonly destroyRef = inject(DestroyRef);
 
   private originalText = '';
 
-  ngOnInit(): void {
-    this.originalText = this.element.nativeElement.textContent?.trim() ?? '';
+  ngAfterViewInit(): void {
+    const nativeElement = this.element.nativeElement;
+
+    this.validateContent();
+
+    this.originalText = nativeElement.textContent?.trim() ?? '';
+
     this.initialized = true;
+
     this.render();
+
     this.t.isLoadingLang$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        // this.t.debug && console.log(`Rerender "${this.originalText}"`)
         this.render();
       });
   }
 
   ngOnChanges(): void {
-    if (!this.initialized) return;
-    //  this.t.debug && console.log(`On Chnags for "${this.originalText}"`)
+    if (!this.initialized) {
+      return;
+    }
+
     this.render();
   }
 
-  ngOnDestroy(): void {}
+  private validateContent(): void {
+    const element = this.element.nativeElement;
+    // console.log('validating ', element);
+
+    if (element.children.length > 0) {
+      console.error(
+        `[@taon-dev/i18n] ${TranslateDirective.selector} should only be used ` +
+          `with plain text. HTML/content elements detected inside:`,
+
+        element,
+      );
+    }
+  }
 
   private render(): void {
-    // console.log('render', this);
     if (!this.t) {
       throw (
         `Directive ${TranslateDirective.selector} applied on component ` +
-        `wihtout implemented Translatable interface`
+        `without implemented Translatable interface`
       );
     }
+
     this.element.nativeElement.textContent = this.t.translate(
       this.originalText,
       this.params,
       this.translateContext,
     );
-    //#region @browser
-    // this.t.cdr?.markForCheck();
-    //#endregion
   }
 }
