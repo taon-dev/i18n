@@ -27,6 +27,10 @@ export class Translation {
   static manager = TranslationManager.Instance;
 
   //#region static for
+  /**
+   * Example how to use it:
+   * const t =  Translation.for(Taon.__FILE_RELATIVE_PATH, Taon.LANG_IMPORT_MAP);
+   */
   static for(
     fileRelativePath: string,
     langImportMap: TaonTranslationsMapImport,
