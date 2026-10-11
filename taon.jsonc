@@ -6,7 +6,7 @@
   "autoReleaseConfigAllowedItems": [
     {
       "artifactName": "npm-lib-and-cli-tool",
-      "releaseType": "manual",
+      "releaseType": "manual-taon",
       "taskName": "npm",
     },
     {
@@ -20,7 +20,7 @@
       "artifactName": "angular-node-app",
       "askUserBeforeFinalAction": false,
       "envName": "localhost",
-      "releaseType": "manual",
+      "releaseType": "manual-taon",
       "taonInstanceIp": "127.0.0.1",
       "taskName": "localhost",
     },
