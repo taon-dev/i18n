@@ -369,7 +369,7 @@ export class LocalTranslationService {
     }> = [];
 
     const preparedText = text.replace(/\[\[[\s\S]*?\]\]/g, originalValue => {
-      const placeholder = `[[${replacements.length}]]`;
+      const placeholder = `TAONINTERPOLATION${replacements.length}PLACEHOLDER`;
 
       replacements.push({
         placeholder,
@@ -387,10 +387,14 @@ export class LocalTranslationService {
 
         for (const replacement of replacements) {
           if (!result.includes(replacement.placeholder)) {
-            throw new Error(
+            console.error(
               `Translation model removed interpolation placeholder ` +
-                `"${replacement.placeholder}" while translating "${text}".`,
+                `"${replacement.placeholder}" while translating "${text}". ` +
+                `Appending "${replacement.originalValue}" manually.`,
             );
+
+            result = `${result.trimEnd()} ${replacement.originalValue}`;
+            continue;
           }
 
           result = result.replaceAll(
