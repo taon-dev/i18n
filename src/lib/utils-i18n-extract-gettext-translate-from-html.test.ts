@@ -1,4 +1,3 @@
-
 import { UtilsI18nHtml } from './utils-i18n-html';
 
 describe('UtilsI18nHtml.extractFromHtml', () => {
@@ -94,6 +93,64 @@ describe('UtilsI18nHtml.extractFromHtml', () => {
 });
 
 describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
+  it('extracts simple t.gettext from passed input', () => {
+    const html = `
+      <mat-tab [label]="t.gettext('Cart')"> anything </mat-tab>
+    `;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 2,
+        gettextString: 'Cart',
+        // params: null,
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('extracts gettext from bound inputs', () => {
+  const html = `
+    <mat-tab [label]="t.gettext('Cart')">anything</mat-tab>
+
+    <button [title]="t.gettext('Save')">
+      {{ t.gettext('Submit') }}
+    </button>
+
+    <input
+      [placeholder]="t.gettext('Search')"
+      [attr.aria-label]="t.gettext('Search products')"
+    />
+  `;
+
+  expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+    {
+      lineNumber: 2,
+      gettextString: 'Cart',
+      context: undefined,
+    },
+    {
+      lineNumber: 4,
+      gettextString: 'Save',
+      context: undefined,
+    },
+    {
+      lineNumber: 5,
+      gettextString: 'Submit',
+      context: undefined,
+    },
+    {
+      lineNumber: 9,
+      gettextString: 'Search',
+      context: undefined,
+    },
+    {
+      lineNumber: 10,
+      gettextString: 'Search products',
+      context: undefined,
+    },
+  ]);
+});
+
   it('extracts simple t.gettext from interpolation', () => {
     const html = `
       <span>{{ t.gettext('translation-app works!') }}</span>

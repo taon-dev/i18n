@@ -58,13 +58,6 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
           extractTranslateParams(inputs) ??
           extractTranslateParamsFromSource(node.sourceSpan.toString());
 
-        // pushMessage(
-        //   node,
-        //   collectText(node.children ?? []),
-        //   extractTranslateParams(inputs),
-        //   translateAttr.value || undefined,
-        // );
-
         pushMessage(
           node,
           collectText(node.children ?? []),
@@ -73,17 +66,22 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
         );
       }
 
+      // Angular bound inputs:
+      // [label]="t.gettext('Cart')"
+      // [title]="t.gettext('Title')"
+      // [placeholder]="t.gettext('Search')"
+      // etc.
       for (const input of inputs) {
+        for (const item of extractGettextCallsFromAst(input.value)) {
+          pushMessage(input, item.gettextString, null, item.context);
+        }
+
         for (const text of extractTranslatePipeStrings(input.value)) {
-          pushMessage(node, text);
+          pushMessage(input, text);
         }
       }
 
       if (isBoundText(node)) {
-        // for (const text of extractTranslatePipeStrings(node.value)) {
-        //   pushMessage(node, text);
-        // }
-
         for (const item of extractGettextCallsFromHtmlExpression(
           node.sourceSpan.toString(),
         )) {
@@ -530,6 +528,67 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
     return Object.keys(result).length ? result : null;
     //#endregion
   }
+
+  //#region @esmRemove
+  function extractGettextCallsFromAst(ast: AST | any): Array<{
+    gettextString: string;
+    context?: string;
+  }> {
+    //#region @backendFunc
+    const result: Array<{
+      gettextString: string;
+      context?: string;
+    }> = [];
+
+    const visit = (node: any): void => {
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+
+      if (
+        node.constructor?.name === 'Call' &&
+        node.receiver?.constructor?.name === 'PropertyRead' &&
+        node.receiver.name === 'gettext'
+      ) {
+        const args = node.args ?? [];
+
+        const gettextString =
+          args[0]?.constructor?.name === 'LiteralPrimitive' &&
+          typeof args[0].value === 'string'
+            ? args[0].value
+            : undefined;
+
+        if (gettextString) {
+          const context =
+            args[2]?.constructor?.name === 'LiteralPrimitive' &&
+            typeof args[2].value === 'string'
+              ? args[2].value
+              : undefined;
+
+          result.push({
+            gettextString,
+            context,
+          });
+        }
+      }
+
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            visit(item);
+          }
+        } else if (value && typeof value === 'object') {
+          visit(value);
+        }
+      }
+    };
+
+    visit(ast);
+
+    return result;
+    //#endregion
+  }
+  //#endregion
 
   //#region @esmRemove
   function extractTranslatePipeStrings(ast: AST | any): string[] {
