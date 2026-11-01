@@ -73,7 +73,7 @@ export class Translation {
   //#region constructor
   private constructor(
     protected fileRelativePath: string,
-    protected localFileLang: UtilsI18n.CommonLocaleCode,
+    public localFileLang: UtilsI18n.CommonLocaleCode,
     protected langImportMap: TaonTranslationsMapImport,
     public debug = false,
   ) {
