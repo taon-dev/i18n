@@ -108,8 +108,175 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
     ]);
   });
 
+  it('extracts simple t.gettext from passed input in angular syntax', () => {
+    const html = `
+   @if (mediaAttachment(); as media) {
+      <mat-card class="post-setting-card">
+        <section
+          class="media-attachment"
+          aria-labelledby="media-attachment-heading">
+          <h2 id="media-attachment-heading">{{ media.heading }}</h2>
+          @if (uploading()) {
+            <mat-progress-bar
+              mode="determinate"
+              [value]="uploadProgress()"
+              [attr.aria-label]="t.gettext('Media upload progress')" />
+          }
+          @if (draft()[media.key]; as key) {
+            @if (mediaPreviewLoading()) {
+              <p role="status">
+                {{ t.gettext('Loading media preview...') }}
+              </p>
+            }
+            @if (mediaPreviewError()) {
+              <p
+                class="error"
+                role="alert">
+                {{ mediaPreviewError() }}
+              </p>
+            }
+            @if (media.type === 'video' && mediaPreviewUrl()) {
+              <video
+                controls
+                preload="metadata"
+                [src]="mediaPreviewUrl()">
+                {{
+                  t.gettext(
+                    'Your browser does not support video playback.'
+                  )
+                }}
+              </video>
+            } @else if (media.type === 'audio' && mediaPreviewUrl()) {
+              <audio
+                controls
+                preload="metadata"
+                [src]="mediaPreviewUrl()">
+                {{
+                  t.gettext(
+                    'Your browser does not support audio playback.'
+                  )
+                }}
+              </audio>
+            } @else if (
+              media.type === 'attachment' && mediaPreviewUrl()
+            ) {
+              <p>
+                {{
+                  t.gettext('Attached file: [[ fileName ]]', {
+                    fileName: mediaFileName(key),
+                  })
+                }}
+                <a
+                  [href]="mediaPreviewUrl()"
+                  target="_blank"
+                  rel="noopener"
+                  >{{ t.gettext('Download or open') }}</a
+                >
+              </p>
+            }
+            <input
+              #mediaInput
+              hidden
+              type="file"
+              [accept]="media.accept"
+              [disabled]="busy() || dialogOpen()"
+              (change)="fileSelected($event)" />
+            <button
+              mat-button
+              type="button"
+              [disabled]="busy() || dialogOpen()"
+              (click)="mediaInput.click()">
+              {{ t.gettext('Replace') }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              [disabled]="busy() || dialogOpen()"
+              (click)="removeMedia()">
+              {{ t.gettext('Remove') }}
+            </button>
+          } @else {
+            <input
+              #mediaInput
+              hidden
+              type="file"
+              [accept]="media.accept"
+              [disabled]="busy() || dialogOpen()"
+              (change)="fileSelected($event)" />
+            <button
+              mat-button
+              type="button"
+              [disabled]="busy() || dialogOpen()"
+              (click)="mediaInput.click()">
+              {{ media.uploadLabel }}
+            </button>
+          }
+        </section>
+      </mat-card>
+    }
+  `;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        context: undefined,
+        gettextString: 'Media upload progress',
+        lineNumber: 12,
+      },
+      {
+        context: undefined,
+        gettextString: 'Loading media preview...',
+        lineNumber: 17,
+      },
+      {
+        context: undefined,
+        gettextString: 'Your browser does not support video playback.',
+        lineNumber: 32,
+      },
+      {
+        context: undefined,
+        gettextString: 'Your browser does not support audio playback.',
+        lineNumber: 43,
+      },
+      {
+        context: undefined,
+        gettextString: 'Attached file: [[ fileName ]]',
+        lineNumber: 53,
+      },
+      {
+        context: undefined,
+        gettextString: 'Download or open',
+        lineNumber: 62,
+      },
+      {
+        context: undefined,
+        gettextString: 'Replace',
+        lineNumber: 78,
+      },
+      {
+        context: undefined,
+        gettextString: 'Remove',
+        lineNumber: 85,
+      },
+      {
+        context: undefined,
+        gettextString: 'Your browser does not support video playback.',
+        lineNumber: 33,
+      },
+      {
+        context: undefined,
+        gettextString: 'Your browser does not support audio playback.',
+        lineNumber: 44,
+      },
+      {
+        context: undefined,
+        gettextString: 'Attached file: [[ fileName ]]',
+        lineNumber: 54,
+      },
+    ]);
+  });
+
   it('extracts gettext from bound inputs', () => {
-  const html = `
+    const html = `
     <mat-tab [label]="t.gettext('Cart')">anything</mat-tab>
 
     <button [title]="t.gettext('Save')">
@@ -122,34 +289,34 @@ describe('UtilsI18nHtml.extractGettextTranslateFromHtml - t.gettext()', () => {
     />
   `;
 
-  expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
-    {
-      lineNumber: 2,
-      gettextString: 'Cart',
-      context: undefined,
-    },
-    {
-      lineNumber: 4,
-      gettextString: 'Save',
-      context: undefined,
-    },
-    {
-      lineNumber: 5,
-      gettextString: 'Submit',
-      context: undefined,
-    },
-    {
-      lineNumber: 9,
-      gettextString: 'Search',
-      context: undefined,
-    },
-    {
-      lineNumber: 10,
-      gettextString: 'Search products',
-      context: undefined,
-    },
-  ]);
-});
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 2,
+        gettextString: 'Cart',
+        context: undefined,
+      },
+      {
+        lineNumber: 4,
+        gettextString: 'Save',
+        context: undefined,
+      },
+      {
+        lineNumber: 5,
+        gettextString: 'Submit',
+        context: undefined,
+      },
+      {
+        lineNumber: 9,
+        gettextString: 'Search',
+        context: undefined,
+      },
+      {
+        lineNumber: 10,
+        gettextString: 'Search products',
+        context: undefined,
+      },
+    ]);
+  });
 
   it('extracts simple t.gettext from interpolation', () => {
     const html = `

@@ -101,6 +101,21 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
       for (const child of node.children ?? []) {
         visit(child);
       }
+
+      // Angular @if / @else if / @else
+      for (const branch of node.branches ?? []) {
+        visit(branch);
+      }
+
+      // Angular @for
+      for (const child of node.empty?.children ?? []) {
+        visit(child);
+      }
+
+      // Angular @switch
+      for (const switchCase of node.cases ?? []) {
+        visit(switchCase);
+      }
     };
 
     for (const node of parsed.nodes) {
