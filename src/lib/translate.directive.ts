@@ -6,9 +6,11 @@ import {
   inject,
   Input,
   OnChanges,
+  SecurityContext,
 } from '@angular/core';
 // @ts-ignore
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DomSanitizer } from '@angular/platform-browser';
 
 import { Translation } from './translation';
 
@@ -17,8 +19,6 @@ import { Translation } from './translation';
   standalone: true,
 })
 export class TranslateDirective implements AfterViewInit, OnChanges {
-  private static readonly selector = '[translate]';
-
   // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('translate-t') t!: Translation;
 
@@ -28,65 +28,70 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
   // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('translate-context') translateContext?: string;
 
-  private initialized = false;
+  // eslint-disable-next-line @angular-eslint/no-input-rename
+  @Input('translate-html-key') htmlKey?: string;
 
   private readonly element = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sanitizer = inject(DomSanitizer);
 
+  private initialized = false;
   private originalText = '';
 
   ngAfterViewInit(): void {
-    const nativeElement = this.element.nativeElement;
+    const host = this.element.nativeElement;
 
-    this.validateContent();
+    // Independently marked descendants own their translations.
+    if (host.querySelector('[translate]')) {
+      return;
+    }
 
-    this.originalText = nativeElement.textContent?.trim() ?? '';
+    if (host.children.length > 0 && this.htmlKey === undefined) {
+      return;
+    }
 
+    if (!this.t) {
+      throw new Error('[@taon-dev/i18n] [translate] requires [translate-t].');
+    }
+
+    this.originalText = (host.textContent ?? '').replace(/\s+/g, ' ').trim();
     this.initialized = true;
 
     this.render();
 
     this.t.isLoadingLang$
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.render();
-      });
+      .subscribe(() => this.render());
   }
 
   ngOnChanges(): void {
-    if (!this.initialized) {
-      return;
-    }
-
-    this.render();
-  }
-
-  private validateContent(): void {
-    const element = this.element.nativeElement;
-    // console.log('validating ', element);
-
-    if (element.children.length > 0) {
-      console.error(
-        `[@taon-dev/i18n] ${TranslateDirective.selector} should only be used ` +
-          `with plain text. HTML/content elements detected inside:`,
-
-        element,
-      );
+    if (this.initialized) {
+      this.render();
     }
   }
 
   private render(): void {
-    if (!this.t) {
-      throw (
-        `Directive ${TranslateDirective.selector} applied on component ` +
-        `without implemented Translatable interface`
-      );
-    }
-
-    this.element.nativeElement.textContent = this.t.translate(
-      this.originalText,
+    const host = this.element.nativeElement;
+    const inputTranslate = this.htmlKey ?? this.originalText;
+    const translation = this.t.translate(
+      inputTranslate,
       this.params,
       this.translateContext,
     );
+    // console.log(`${inputTranslate} ==== ${translation}`)
+
+    if (this.htmlKey === undefined) {
+      host.textContent = translation;
+      return;
+    }
+
+    const sanitizedHtml = this.sanitizer.sanitize(
+      SecurityContext.HTML,
+      translation,
+    );
+
+    if (sanitizedHtml !== null && host.innerHTML !== sanitizedHtml) {
+      host.innerHTML = sanitizedHtml;
+    }
   }
 }

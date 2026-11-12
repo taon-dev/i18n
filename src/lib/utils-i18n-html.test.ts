@@ -1,4 +1,3 @@
-
 import { UtilsI18nHtml } from './utils-i18n-html';
 
 describe('UtilsI18nHtml.replaceTranslatePipieDirectiveTContext', () => {
@@ -246,5 +245,68 @@ export class NameComponent {
     );
     // console.log({ changed });
     expect(changed).to.includes(`translate [translate-t]="t"`);
+  });
+});
+
+describe('UtilsI18nHtml.extractGettextTranslateFromHtml - inline HTML', () => {
+  it('extracts a heading with inline code as one message', () => {
+    const html = '<h2 id="install" translate>Install <code>taon</code></h2>';
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 1,
+        gettextString: 'Install <code>taon</code>',
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('preserves nested formatting and link attributes in one message', () => {
+    const html = `
+      <p translate>Read the <a href="/docs/setup"><strong>setup guide</strong></a> first.</p>
+    `;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 2,
+        gettextString:
+          'Read the <a href="/docs/setup"><strong>setup guide</strong></a> first.',
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('keeps the Angular code placeholder inside the message', () => {
+    const html =
+      '<p translate="">Run <code>{{ context.codeblock0 }}</code> to build the project.</p>';
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 1,
+        gettextString:
+          'Run <code>{{ context.codeblock0 }}</code> to build the project.',
+        context: undefined,
+      },
+    ]);
+  });
+
+  it('extracts consecutive blocks as separate messages', () => {
+    const html = `<div>
+  <h3 translate>Build with <code>taon</code></h3>
+  <p translate>Use the <strong>production</strong> configuration.</p>
+</div>`;
+
+    expect(UtilsI18nHtml.extractGettextTranslateFromHtml(html)).toEqual([
+      {
+        lineNumber: 2,
+        gettextString: 'Build with <code>taon</code>',
+        context: undefined,
+      },
+      {
+        lineNumber: 3,
+        gettextString: 'Use the <strong>production</strong> configuration.',
+        context: undefined,
+      },
+    ]);
   });
 });

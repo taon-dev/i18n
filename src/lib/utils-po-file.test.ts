@@ -253,3 +253,67 @@ describe('UtilsPoFile.mergeGettextFile', () => {
     });
   });
 });
+
+describe('UtilsPoFile - inline HTML translations', () => {
+  const fileRelativePath = 'src/lib/docs.html';
+  const gettextString =
+    'Run <code>{{ context.codeblock0 }}</code> before opening the <a href="/docs/setup"><strong>setup guide</strong></a>.';
+  const translation =
+    'Przed otwarciem <a href="/docs/setup"><strong>instrukcji konfiguracji</strong></a> uruchom <code>{{ context.codeblock0 }}</code>.';
+
+  const po = String.raw`
+#: src/lib/docs.html:8
+msgctxt "docs-install"
+msgid ""
+"Run <code>{{ context.codeblock0 }}</code> before opening the "
+"<a href=\"/docs/setup\"><strong>setup guide</strong></a>."
+msgstr ""
+"Przed otwarciem <a href=\"/docs/setup\"><strong>instrukcji konfiguracji</strong></a> "
+"uruchom <code>{{ context.codeblock0 }}</code>."
+`;
+
+  it('preserves inline HTML and interpolation in multiline PO entries', () => {
+    expect(UtilsPoFile.extractPoToJson(po)).toEqual([
+      {
+        fileAbsPath: fileRelativePath,
+        fileRelativePath,
+        tags: [
+          {
+            lineNumber: 8,
+            gettextString,
+            context: 'docs-install',
+            translation,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps the HTML translation when its source line changes', () => {
+    const [oldFromPo] = UtilsPoFile.extractPoToJson(po);
+    const freshFromSource: UtilsI18n.GettextFile = {
+      fileAbsPath: 'c:/project/src/lib/docs.html',
+      fileRelativePath,
+      isAppFile: false,
+      tags: [
+        {
+          lineNumber: 24,
+          gettextString,
+          context: 'docs-install',
+        },
+      ],
+    };
+
+    expect(UtilsPoFile.mergeGettextFile(freshFromSource, oldFromPo)).toEqual({
+      ...freshFromSource,
+      tags: [
+        {
+          lineNumber: 24,
+          gettextString,
+          context: 'docs-install',
+          translation,
+        },
+      ],
+    });
+  });
+});

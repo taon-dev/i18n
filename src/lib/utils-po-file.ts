@@ -12,7 +12,10 @@ export namespace UtilsPoFile {
 
     for (const locale of locales) {
       const poContent = generatePoFileContent(files, locale);
-      const poFilePath = crossPlatformPath([destinationAbsFolderPath, `${locale}.po`]);
+      const poFilePath = crossPlatformPath([
+        destinationAbsFolderPath,
+        `${locale}.po`,
+      ]);
 
       fse.writeFileSync(poFilePath, poContent, 'utf8');
     }
@@ -159,25 +162,23 @@ export namespace UtilsPoFile {
       }
     }
 
-    const lines: string[] = [];
-
-    lines.push(`export interface ${interfaceName} {`);
-    lines.push(`  "${escapeTs(locale)}": {`);
+    const lines: string[] = [
+      `export interface ${interfaceName} {`,
+      `  ${JSON.stringify(locale)}: {`,
+    ];
 
     for (const [context, strings] of contexts) {
-      lines.push(`  "${escapeTs(context)}": {`);
+      lines.push(`    ${JSON.stringify(context)}: {`);
 
       for (const text of strings.sort()) {
-        lines.push(`    "${escapeTs(text)}"?: string;`);
+        lines.push(`      ${JSON.stringify(text)}?: string;`);
       }
 
-      lines.push(`  };`);
+      lines.push('    };');
       lines.push('');
     }
 
-    lines.push(`  };`);
-
-    lines.push(`}`);
+    lines.push('  };', '}');
 
     return lines.join('\n');
     //#endregion

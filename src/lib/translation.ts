@@ -1,15 +1,8 @@
 //#region imports
-import {
-  ChangeDetectorRef,
-  inject,
-  signal,
-  WritableSignal,
-} from '@angular/core'; // @browser
-import type {
-  WritableSignal as WritableSignalType,
-} from '@angular/core';
+import { ChangeDetectorRef, inject, signal } from '@angular/core'; // @browser
+import type { WritableSignal as WritableSignalType } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { GlobalStorage, UtilsI18n, _ } from 'tnp-core/src';
+import { UtilsI18n, _ } from 'tnp-core/src';
 
 import { TranslationManager } from './translation-manager';
 import {
@@ -18,8 +11,6 @@ import {
   TranslationLookup,
   TranslationParams,
 } from './translation.models';
-import type { UtilsPoFile } from './utils-po-file';
-
 //#endregion
 
 //#region translation class
@@ -27,35 +18,28 @@ export class Translation {
   static manager = TranslationManager.Instance;
 
   //#region static for
-  /**
-   * Example how to use it:
-   * const t =  Translation.for(Taon.__FILE_RELATIVE_PATH, Taon.LANG_IMPORT_MAP);
-   */
   static for(
     fileRelativePath: string,
     langImportMap: TaonTranslationsMapImport,
-    opt?: {
-      debug?: boolean;
-    },
+    opt?: { debug?: boolean },
   ): Translation {
-    opt = opt || {};
     return new Translation(
       fileRelativePath,
       Translation.manager.currentGlobalLanguage,
       langImportMap,
-      !!opt.debug,
+      !!opt?.debug,
     );
   }
   //#endregion
 
   //#region fields
-
   //#region @browser
   public cdr?: ChangeDetectorRef;
-
   //#endregion
 
   private lookup: TranslationLookup = {};
+
+  private lookupIgnoringBreakNewlines: TranslationLookup = {};
 
   private readonly loadingSubjectSrc = new BehaviorSubject(false);
 
@@ -77,14 +61,7 @@ export class Translation {
     protected langImportMap: TaonTranslationsMapImport,
     public debug = false,
   ) {
-
-    if (!Translation.manager.instances.has(this)) {
-      // console.log(`Adding for ${fileRelativePath} `)
-      Translation.manager.instances.add(this);
-    } else {
-      // console.log(`NOT ADDING for ${fileRelativePath} `)
-    }
-    // console.log(...Translation.manager.instances)
+    Translation.manager.instances.add(this);
   }
   //#endregion
 
@@ -92,15 +69,16 @@ export class Translation {
   for(_classThis: object): Translation {
     if (this.useGlobalLangFile) {
       this.localFileLang = Translation.manager.currentGlobalLanguage;
-      // console.log(`Update on t.for() ${this.localFileLang}`)
     }
+
     //#region @browser
     try {
       this.cdr = inject(ChangeDetectorRef);
     } catch {
-      // non-angular class/backend-safe
+      // This method can also be called outside an Angular injection context.
     }
     //#endregion
+
     void this.ensureLoaded();
 
     return this;
@@ -112,6 +90,7 @@ export class Translation {
     this.useGlobalLangFile = false;
     this.localFileLang = lang;
     await this.ensureLoaded(true);
+
     //#region @browser
     this.cdr?.markForCheck();
     //#endregion
@@ -119,9 +98,10 @@ export class Translation {
   //#endregion
 
   //#region use global file lang
-  async useGlobalFileLang( ): Promise<void> {
+  async useGlobalFileLang(): Promise<void> {
     this.useGlobalLangFile = true;
     await this.ensureLoaded(true);
+
     //#region @browser
     this.cdr?.markForCheck();
     //#endregion
@@ -134,20 +114,11 @@ export class Translation {
     params?: TranslationParams,
     context = '',
   ): string => {
-    const key = this.key(text, context);
-    const translated = this.lookup[key] ?? text;
-    this.debug &&
-      console.log(
-        `Translate (with load): "${text}" to "${translated}", key="${key}" params:${_.isObject(params) ? JSON.stringify(params) : params} ` +
-          `localFileLang: ${this.localFileLang}`,
-        this,
-      );
-    return this.interpolate(translated, params);
+    return this.gettextWithoutEnsureLoaded(text, params, context);
   };
   //#endregion
 
   //#region signal
-
   private createSignal(
     text: string,
     params?: TranslationParams,
@@ -174,7 +145,7 @@ export class Translation {
   };
   //#endregion
 
-  //#region $ obserable
+  //#region observable
   private createObservable(
     text: string,
     params?: TranslationParams,
@@ -200,7 +171,7 @@ export class Translation {
   };
   //#endregion
 
-  //#region private methods / refresh bindings
+  //#region refresh bindings
   private refreshBindings(): void {
     for (const binding of this.bindings) {
       binding.update(
@@ -214,8 +185,7 @@ export class Translation {
   }
   //#endregion
 
-  //#region private methods / gettextwithout ensure loadded
-
+  //#region translation lookup
   translate(text: string, params?: TranslationParams, context = ''): string {
     return this.gettextWithoutEnsureLoaded(text, params, context);
   }
@@ -226,23 +196,33 @@ export class Translation {
     context = '',
   ): string {
     const key = this.key(text, context);
-    const translated = this.lookup[key] ?? text;
-    this.debug &&
+    const translated =
+      this.lookup[key] ??
+      this.lookupIgnoringBreakNewlines[
+        this.key(this.normalizeBreakNewlines(text), context)
+      ] ??
+      text;
+
+    if (this.debug) {
       console.log(
-        `Translate (no load): "${text}" to "${translated}", key="${key}" params:${_.isObject(params) ? JSON.stringify(params) : params} ` +
-          `localFileLang: ${this.localFileLang}`,
+        `Translate: "${text}" to "${translated}", key="${key}" params:${
+          _.isObject(params) ? JSON.stringify(params) : params
+        } localFileLang: ${this.localFileLang}`,
         this,
       );
+    }
+
     return this.interpolate(translated, params);
   }
   //#endregion
 
-  //#region private methods / load
+  //#region load
   private async load(): Promise<void> {
     this.loadingSubjectSrc.next(true);
 
     const files: UtilsI18n.GettextFile[] = [];
     const filesForTArr = Object.keys(this.langImportMap);
+
     for (const fileRelativePath of filesForTArr) {
       try {
         const loader =
@@ -263,6 +243,7 @@ export class Translation {
         );
       }
     }
+
     this.loadedLang = this.localFileLang;
     this.lookup = this.createLookup(files);
     this.debug && console.log(`${this.localFileLang}`, files, this.lookup);
@@ -272,11 +253,12 @@ export class Translation {
     //#region @browser
     this.cdr?.markForCheck();
     //#endregion
+
     this.loadingSubjectSrc.next(false);
   }
   //#endregion
 
-  //#region private methods / ensure loaded
+  //#region ensure loaded
   private async ensureLoaded(force = false): Promise<void> {
     if (this.useGlobalLangFile) {
       this.localFileLang = Translation.manager.currentGlobalLanguage;
@@ -300,38 +282,52 @@ export class Translation {
   }
   //#endregion
 
-  //#region private methods / create lookup
+  //#region create lookup
   private createLookup(files: UtilsI18n.GettextFile[]): TranslationLookup {
     const lookup: TranslationLookup = {};
+    const lookupIgnoringBreakNewlines: TranslationLookup = {};
 
     for (const file of files) {
       for (const tag of file.tags ?? []) {
-        if (!tag.translation) continue;
-        lookup[this.key(tag.gettextString, tag.context ?? '')] =
-          tag.translation;
+        if (!tag.translation) {
+          continue;
+        }
+
+        const context = tag.context ?? '';
+        const text = tag.gettextString;
+
+        lookup[this.key(text, context)] = tag.translation;
+        lookupIgnoringBreakNewlines[
+          this.key(this.normalizeBreakNewlines(text), context)
+        ] = tag.translation;
       }
     }
 
+    this.lookupIgnoringBreakNewlines = lookupIgnoringBreakNewlines;
     return lookup;
   }
   //#endregion
 
-  //#region private methods / key
+  //#region lookup keys
   private key(text: string, context = ''): string {
     return `${context}\u0004${text}`;
   }
+
+  private normalizeBreakNewlines(text: string): string {
+    return text.replace(/<br\s*\/?>(?:[ \t]*\r?\n[ \t]*)*/gi, '<br>');
+  }
   //#endregion
 
-  //#region private methods / interpolate
+  //#region interpolate
   private interpolate(text: string, params?: Record<string, unknown>): string {
-    if (!params) return text;
+    if (!params) {
+      return text;
+    }
 
-    const result = text.replace(/\[\[\s*([a-zA-Z0-9_$]+)\s*\]\]/g, (_, key) => {
+    return text.replace(/\[\[\s*([a-zA-Z0-9_$]+)\s*\]\]/g, (_, key) => {
       const value = params[key];
       return value === undefined || value === null ? '' : String(value);
     });
-
-    return result;
   }
   //#endregion
 }

@@ -35,14 +35,14 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
       gettextString: string,
       params?: Record<string, string> | null,
       context?: string,
+      normalize: (text: string) => string = normalizeHtmlText,
     ) => {
-      const normalized = normalizeHtmlText(gettextString);
+      const normalized = normalize(gettextString);
       if (!normalized) return;
 
       messages.push({
         lineNumber: node.sourceSpan.start.line + 1,
         gettextString: normalized,
-        // params: params ?? null,
         context,
       });
     };
@@ -58,11 +58,22 @@ export namespace UtilsI18nExtractGettextTranslateFromHtml {
           extractTranslateParams(inputs) ??
           extractTranslateParamsFromSource(node.sourceSpan.toString());
 
+        const innerHtml =
+          node instanceof TmplAstElement &&
+          node.endSourceSpan &&
+          node.children.some(child => child instanceof TmplAstElement)
+            ? html.slice(
+                node.startSourceSpan.end.offset,
+                node.endSourceSpan.start.offset,
+              )
+            : undefined;
+
         pushMessage(
           node,
-          collectText(node.children ?? []),
+          innerHtml ?? collectText(node.children ?? []),
           params,
           translateAttr.value || undefined,
+          innerHtml === undefined ? normalizeHtmlText : text => text.trim(),
         );
       }
 
