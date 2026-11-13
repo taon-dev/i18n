@@ -35,6 +35,9 @@ export class TranslatePipe implements PipeTransform, OnDestroy {
     context?: string,
   ): string {
     return t?.gettext(text, params, context) ?? text;
+    // const translated = t?.gettext(text, params, context) ?? text;
+    // console.log(`text t=${!!t} , text=${text} => ${translated}`);
+    // return translated;
   }
 
   ngOnDestroy(): void {

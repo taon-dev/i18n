@@ -2,20 +2,36 @@
 import { ChangeDetectorRef, inject, signal } from '@angular/core'; // @browser
 import type { WritableSignal as WritableSignalType } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { UtilsI18n, _ } from 'tnp-core/src';
+import { UtilsI18n } from 'tnp-core/src';
 
 import { TranslationManager } from './translation-manager';
 import {
   TaonTranslationsMapImport,
   TranslationBinding,
-  TranslationLookup,
   TranslationParams,
 } from './translation.models';
 //#endregion
 
+type Locale = UtilsI18n.CommonLocaleCode;
+type CatalogLoader = () => Promise<UtilsI18n.GettextFile>;
+
+interface CatalogLookup {
+  exact: Map<string, string>;
+  breaks: Map<string, string>;
+  html: Map<string, string>;
+}
+
+interface Catalog {
+  loader: CatalogLoader;
+  lookup?: CatalogLookup;
+  loading?: Promise<void>;
+}
+
 //#region translation class
 export class Translation {
   static manager = TranslationManager.Instance;
+
+  private static readonly catalogs = new Map<Locale, Map<string, Catalog>>();
 
   //#region static for
   static for(
@@ -37,47 +53,37 @@ export class Translation {
   public cdr?: ChangeDetectorRef;
   //#endregion
 
-  private lookup: TranslationLookup = {};
-
-  private lookupIgnoringBreakNewlines: TranslationLookup = {};
-
-  private lookupNormalizedHtml = new Map<string, string | null>();
-
   private readonly loadingSubjectSrc = new BehaviorSubject(false);
 
   public readonly isLoadingLang$ = this.loadingSubjectSrc.asObservable();
 
-  private loading?: Promise<void>;
-
-  private loadedLang?: UtilsI18n.CommonLocaleCode;
-
   private readonly bindings = new Set<TranslationBinding>();
+  private readonly fileCatalogs = new Map<Locale, Catalog>();
 
   private useGlobalLangFile = true;
+  private loadVersion = 0;
+  private active = false;
   //#endregion
 
   //#region constructor
   private constructor(
     protected fileRelativePath: string,
-    public localFileLang: UtilsI18n.CommonLocaleCode,
+    public localFileLang: Locale,
     protected langImportMap: TaonTranslationsMapImport,
     public debug = false,
   ) {
+    this.registerCatalogs();
     Translation.manager.instances.add(this);
   }
   //#endregion
 
   //#region for
   for(_classThis: object): Translation {
-    if (this.useGlobalLangFile) {
-      this.localFileLang = Translation.manager.currentGlobalLanguage;
-    }
-
     //#region @browser
     try {
       this.cdr = inject(ChangeDetectorRef);
     } catch {
-      // This method can also be called outside an Angular injection context.
+      // This method can also be called outside Angular's injection context.
     }
     //#endregion
 
@@ -87,26 +93,16 @@ export class Translation {
   }
   //#endregion
 
-  //#region change file lang
-  async changeFileLang(lang: UtilsI18n.CommonLocaleCode): Promise<void> {
+  //#region language selection
+  async changeFileLang(lang: Locale): Promise<void> {
     this.useGlobalLangFile = false;
     this.localFileLang = lang;
-    await this.ensureLoaded(true);
-
-    //#region @browser
-    this.cdr?.markForCheck();
-    //#endregion
+    await this.ensureLoaded();
   }
-  //#endregion
 
-  //#region use global file lang
   async useGlobalFileLang(): Promise<void> {
     this.useGlobalLangFile = true;
-    await this.ensureLoaded(true);
-
-    //#region @browser
-    this.cdr?.markForCheck();
-    //#endregion
+    await this.ensureLoaded();
   }
   //#endregion
 
@@ -118,6 +114,18 @@ export class Translation {
   ): string => {
     return this.gettextWithoutEnsureLoaded(text, params, context);
   };
+
+  translate(text: string, params?: TranslationParams, context = ''): string {
+    return this.gettextWithoutEnsureLoaded(text, params, context);
+  }
+
+  translateHtml(
+    text: string,
+    params?: TranslationParams,
+    context = '',
+  ): string {
+    return this.gettextWithoutEnsureLoaded(text, params, context, true);
+  }
   //#endregion
 
   //#region signal
@@ -127,16 +135,16 @@ export class Translation {
     context = '',
   ): WritableSignalType<string> {
     //#region @browser
-    const s = signal<string>(this.gettext(text, params, context));
+    const value = signal<string>(this.gettext(text, params, context));
 
     this.bindings.add({
       text,
       params,
       context,
-      update: value => s.set(value),
+      update: translation => value.set(translation),
     });
 
-    return s;
+    return value;
     //#endregion
     return void 0;
   }
@@ -153,15 +161,13 @@ export class Translation {
     params?: TranslationParams,
     context = '',
   ): Observable<string> {
-    const subject = new BehaviorSubject<string>(
-      this.gettext(text, params, context),
-    );
+    const subject = new BehaviorSubject(this.gettext(text, params, context));
 
     this.bindings.add({
       text,
       params,
       context,
-      update: value => subject.next(value),
+      update: translation => subject.next(translation),
     });
 
     return subject.asObservable();
@@ -173,7 +179,115 @@ export class Translation {
   };
   //#endregion
 
-  //#region refresh bindings
+  //#region catalog registration
+  private registerCatalogs(): void {
+    for (const path of Object.keys(this.langImportMap)) {
+      const loaders = this.langImportMap[path];
+
+      for (const locale of Object.keys(loaders) as Locale[]) {
+        const loader = loaders[locale];
+
+        if (!loader) {
+          continue;
+        }
+
+        let catalogs = Translation.catalogs.get(locale);
+
+        if (!catalogs) {
+          catalogs = new Map<string, Catalog>();
+          Translation.catalogs.set(locale, catalogs);
+        }
+
+        let catalog = catalogs.get(path);
+
+        if (!catalog) {
+          catalog = { loader };
+          catalogs.set(path, catalog);
+        }
+
+        if (path === this.fileRelativePath) {
+          this.fileCatalogs.set(locale, catalog);
+        }
+      }
+    }
+  }
+  //#endregion
+
+  //#region catalog loading
+  private async ensureLoaded(): Promise<void> {
+    if (this.useGlobalLangFile) {
+      this.localFileLang = Translation.manager.currentGlobalLanguage;
+    }
+
+    this.active = true;
+
+    const locale = this.localFileLang;
+    const version = ++this.loadVersion;
+    const catalogs = Translation.catalogs.get(locale);
+
+    this.loadingSubjectSrc.next(true);
+
+    try {
+      if (catalogs) {
+        await Promise.all(
+          Array.from(catalogs, ([path, catalog]) =>
+            this.loadCatalog(path, locale, catalog),
+          ),
+        );
+      }
+    } finally {
+      if (version === this.loadVersion) {
+        this.loadingSubjectSrc.next(false);
+      }
+    }
+
+    // Newly loaded catalogs can satisfy misses in other active instances.
+    for (const instance of Translation.manager.instances) {
+      if (instance.active && instance.localFileLang === locale) {
+        instance.refreshBindings();
+
+        //#region @browser
+        instance.cdr?.markForCheck();
+        //#endregion
+
+        if (instance !== this && !instance.loadingSubjectSrc.value) {
+          instance.loadingSubjectSrc.next(false);
+        }
+      }
+    }
+  }
+
+  private async loadCatalog(
+    path: string,
+    locale: Locale,
+    catalog: Catalog,
+  ): Promise<void> {
+    if (catalog.lookup) {
+      return;
+    }
+
+    catalog.loading ??= Promise.resolve()
+      .then(() => catalog.loader())
+      .then(moduleOrFile => {
+        const file =
+          (moduleOrFile as { default?: UtilsI18n.GettextFile }).default ??
+          moduleOrFile;
+
+        catalog.lookup = this.createLookup(file);
+      })
+      .catch(error => {
+        console.error(
+          `[taon-i18n] Error loading ${locale} catalog ${path}`,
+          error,
+        );
+      })
+      .finally(() => {
+        catalog.loading = undefined;
+      });
+
+    await catalog.loading;
+  }
+
   private refreshBindings(): void {
     for (const binding of this.bindings) {
       binding.update(
@@ -188,160 +302,105 @@ export class Translation {
   //#endregion
 
   //#region translation lookup
-  translate(text: string, params?: TranslationParams, context = ''): string {
-    return this.gettextWithoutEnsureLoaded(text, params, context);
-  }
-
-  translateHtml(
-    text: string,
-    params?: TranslationParams,
-    context = '',
-  ): string {
-    return this.gettextWithoutEnsureLoaded(text, params, context, true);
-  }
-
   private gettextWithoutEnsureLoaded(
     text: string,
     params?: TranslationParams,
     context = '',
     html = false,
   ): string {
-    const key = this.key(text, context);
-    const exact = this.lookup[key];
-    let translated = exact ?? text;
+    const exactKey = this.key(text, context);
+    const breakKey = this.key(this.normalizeBreakNewlines(text), context);
+    const htmlKey = html
+      ? this.key(this.normalizeHtmlKey(text), context)
+      : undefined;
 
-    if (exact === undefined) {
-      const normalizedHtml = html
-        ? this.lookupNormalizedHtml.get(
-            this.key(this.normalizeHtmlKey(text), context),
-          )
-        : undefined;
+    const fileCatalog = this.fileCatalogs.get(this.localFileLang);
+    let translated = this.findInCatalog(
+      fileCatalog,
+      exactKey,
+      breakKey,
+      htmlKey,
+    );
 
-      // A null entry means different translations share this normalized key.
-      if (normalizedHtml !== null) {
-        translated =
-          normalizedHtml ??
-          this.lookupIgnoringBreakNewlines[
-            this.key(this.normalizeBreakNewlines(text), context)
-          ] ??
-          text;
-      }
-    }
+    if (translated === undefined) {
+      const catalogs = Translation.catalogs.get(this.localFileLang);
 
-    if (this.debug) {
-      console.log(
-        `Translate: "${text}" to "${translated}", key="${key}" params:${
-          _.isObject(params) ? JSON.stringify(params) : params
-        } localFileLang: ${this.localFileLang}`,
-        this,
-      );
-    }
+      if (catalogs) {
+        for (const catalog of catalogs.values()) {
+          if (catalog === fileCatalog) {
+            continue;
+          }
 
-    return this.interpolate(translated, params);
-  }
-  //#endregion
+          translated = this.findInCatalog(catalog, exactKey, breakKey, htmlKey);
 
-  //#region load
-  private async load(): Promise<void> {
-    this.loadingSubjectSrc.next(true);
-
-    const files: UtilsI18n.GettextFile[] = [];
-    const filesForTArr = Object.keys(this.langImportMap);
-
-    for (const fileRelativePath of filesForTArr) {
-      try {
-        const loader =
-          this.langImportMap[fileRelativePath]?.[this.localFileLang];
-
-        if (!loader) {
-          continue;
-        }
-
-        const modOrFile = await loader();
-        const file = (modOrFile as any).default ?? modOrFile;
-
-        files.push(file);
-      } catch (err) {
-        console.log(
-          `[taon-i18n] Error loading language file ${fileRelativePath} `,
-          err,
-        );
-      }
-    }
-
-    this.loadedLang = this.localFileLang;
-    this.lookup = this.createLookup(files);
-    this.debug && console.log(`${this.localFileLang}`, files, this.lookup);
-
-    this.refreshBindings();
-
-    //#region @browser
-    this.cdr?.markForCheck();
-    //#endregion
-
-    this.loadingSubjectSrc.next(false);
-  }
-  //#endregion
-
-  //#region ensure loaded
-  private async ensureLoaded(force = false): Promise<void> {
-    if (this.useGlobalLangFile) {
-      this.localFileLang = Translation.manager.currentGlobalLanguage;
-    }
-
-    if (!force && this.loadedLang === this.localFileLang) {
-      return;
-    }
-
-    if (!force && this.loading) {
-      return this.loading;
-    }
-
-    this.loading = this.load();
-
-    try {
-      await this.loading;
-    } finally {
-      this.loading = undefined;
-    }
-  }
-  //#endregion
-
-  //#region create lookup
-  private createLookup(files: UtilsI18n.GettextFile[]): TranslationLookup {
-    const lookup: TranslationLookup = {};
-    const lookupIgnoringBreakNewlines: TranslationLookup = {};
-    const lookupNormalizedHtml = new Map<string, string | null>();
-
-    for (const file of files) {
-      for (const tag of file.tags ?? []) {
-        if (!tag.translation) {
-          continue;
-        }
-
-        const context = tag.context ?? '';
-        const text = tag.gettextString;
-
-        lookup[this.key(text, context)] = tag.translation;
-        lookupIgnoringBreakNewlines[
-          this.key(this.normalizeBreakNewlines(text), context)
-        ] = tag.translation;
-
-        if (/<[a-z][\s\S]*?>/i.test(text)) {
-          const htmlKey = this.key(this.normalizeHtmlKey(text), context);
-          const existing = lookupNormalizedHtml.get(htmlKey);
-
-          if (existing === undefined) {
-            lookupNormalizedHtml.set(htmlKey, tag.translation);
-          } else if (existing !== tag.translation) {
-            lookupNormalizedHtml.set(htmlKey, null);
+          if (translated !== undefined) {
+            break;
           }
         }
       }
     }
 
-    this.lookupIgnoringBreakNewlines = lookupIgnoringBreakNewlines;
-    this.lookupNormalizedHtml = lookupNormalizedHtml;
+    if (this.debug) {
+      console.log('[taon-i18n] Translation lookup', {
+        path: this.fileRelativePath,
+        locale: this.localFileLang,
+        context,
+        text,
+        translated,
+      });
+    }
+
+    return this.interpolate(translated ?? text, params);
+  }
+
+  private findInCatalog(
+    catalog: Catalog | undefined,
+    exactKey: string,
+    breakKey: string,
+    htmlKey: string | undefined,
+  ): string | undefined {
+    const lookup = catalog?.lookup;
+
+    return (
+      lookup?.exact.get(exactKey) ??
+      (htmlKey === undefined ? undefined : lookup?.html.get(htmlKey)) ??
+      lookup?.breaks.get(breakKey)
+    );
+  }
+
+  private createLookup(file: UtilsI18n.GettextFile): CatalogLookup {
+    const lookup: CatalogLookup = {
+      exact: new Map(),
+      breaks: new Map(),
+      html: new Map(),
+    };
+
+    for (const tag of file.tags ?? []) {
+      if (!tag.translation) {
+        continue;
+      }
+
+      const text = tag.gettextString;
+      const context = tag.context ?? '';
+
+      const keys: [Map<string, string>, string][] = [
+        [lookup.exact, this.key(text, context)],
+        [lookup.breaks, this.key(this.normalizeBreakNewlines(text), context)],
+      ];
+
+      if (/<[a-z][\s\S]*?>/i.test(text)) {
+        keys.push([
+          lookup.html,
+          this.key(this.normalizeHtmlKey(text), context),
+        ]);
+      }
+
+      for (const [index, key] of keys) {
+        if (!index.has(key)) {
+          index.set(key, tag.translation);
+        }
+      }
+    }
 
     return lookup;
   }
@@ -389,10 +448,6 @@ export class Translation {
         },
       )
       .replace(/[ \t\r\n\f]+/g, ' ')
-      .replace(/ *<br> */g, '<br>')
-      .replace(/(<strong>) +(?=<a\b)/gi, '$1')
-      .replace(/(<\/a>) +(?=<\/strong>)/gi, '$1')
-      .replace(/[ \t\r\n\f]+/g, ' ')
       .replace(/ *> */g, '>')
       .replace(/ *< */g, '<')
       .trim();
@@ -400,7 +455,7 @@ export class Translation {
   //#endregion
 
   //#region interpolate
-  private interpolate(text: string, params?: Record<string, unknown>): string {
+  private interpolate(text: string, params?: TranslationParams): string {
     if (!params) {
       return text;
     }
@@ -413,39 +468,3 @@ export class Translation {
   //#endregion
 }
 //#endregion
-
-//#region EXMAPLE
-/*
-// import {Translation} from 'taon'
-
-const t = Translation.for(Taon.__FILE_RELATIVE_PATH, Taon.LANG_IMPORT_MAP); // in runtime replaced with proper stuff
-
-t.gettext('asdasd');
-
-class AnyAngularOrTaonClass {
-  t = t.for(this); // probably only usefull for cdr in angular
-
-  isLoading$ = t.isLoadingLang$; // maybe needed sometime
-
-  refreshableSignalLabel$ = t.signal.gettext(t.gettext('welcome'));
-
-  refreshableRxjsLabel$ = t.$.gettext('amazing better place'); // probably even better
-
-  asdsa = this.t.gettext(
-    // just sugar syntax
-    'This is mamazing',
-    {
-      asdasd: 'asd',
-    },
-    'asdas',
-  );
-
-  ngOnInit(): void {
-    //Called after the constructor, initializing input properties, and the first call to ngOnChanges.
-    //Add 'implements OnInit' to the class.
-    const lable = t.gettext('hello');
-  }
-}
-  */
-//#endregion
-
