@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  booleanAttribute,
   DestroyRef,
   Directive,
   ElementRef,
@@ -31,12 +32,29 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
   // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('translate-html-key') htmlKey?: string;
 
+  // eslint-disable-next-line @angular-eslint/no-input-rename
+  @Input({ alias: 'translate-html', transform: booleanAttribute })
+  translateHtml = false;
+
   private readonly element = inject(ElementRef<HTMLElement>);
+
   private readonly destroyRef = inject(DestroyRef);
+
   private readonly sanitizer = inject(DomSanitizer);
 
   private initialized = false;
+
   private originalText = '';
+
+  private originalHtml = '';
+
+  private originalNodes: Node[] = [];
+
+  private renderedHtml = false;
+
+  private get useHtml(): boolean {
+    return this.translateHtml || this.htmlKey !== undefined;
+  }
 
   ngAfterViewInit(): void {
     const host = this.element.nativeElement;
@@ -46,7 +64,7 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
       return;
     }
 
-    if (host.children.length > 0 && this.htmlKey === undefined) {
+    if (host.children.length > 0 && !this.useHtml) {
       return;
     }
 
@@ -55,8 +73,24 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
     }
 
     this.originalText = (host.textContent ?? '').replace(/\s+/g, ' ').trim();
-    this.initialized = true;
 
+    if (this.useHtml) {
+      this.originalNodes = Array.from(host.childNodes);
+
+      const source = host.cloneNode(true) as HTMLElement;
+
+      source.querySelectorAll('*').forEach(child => {
+        for (const name of child.getAttributeNames()) {
+          if (name.startsWith('_ngcontent-')) {
+            child.removeAttribute(name);
+          }
+        }
+      });
+
+      this.originalHtml = source.innerHTML.trim();
+    }
+
+    this.initialized = true;
     this.render();
 
     this.t.isLoadingLang$
@@ -72,16 +106,25 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
 
   private render(): void {
     const host = this.element.nativeElement;
-    const inputTranslate = this.htmlKey ?? this.originalText;
-    const translation = this.t.translate(
-      inputTranslate,
-      this.params,
-      this.translateContext,
-    );
-    // console.log(`${inputTranslate} ==== ${translation}`)
+    const useHtml = this.useHtml;
+    const key =
+      this.htmlKey ?? (useHtml ? this.originalHtml : this.originalText);
+    const translation = useHtml
+      ? this.t.translateHtml(key, this.params, this.translateContext)
+      : this.t.translate(key, this.params, this.translateContext);
 
-    if (this.htmlKey === undefined) {
-      host.textContent = translation;
+    if (!useHtml) {
+      if (host.textContent !== translation) {
+        host.textContent = translation;
+      }
+      return;
+    }
+
+    if (translation === key) {
+      if (this.renderedHtml) {
+        host.replaceChildren(...this.originalNodes);
+        this.renderedHtml = false;
+      }
       return;
     }
 
@@ -92,6 +135,7 @@ export class TranslateDirective implements AfterViewInit, OnChanges {
 
     if (sanitizedHtml !== null && host.innerHTML !== sanitizedHtml) {
       host.innerHTML = sanitizedHtml;
+      this.renderedHtml = true;
     }
   }
 }

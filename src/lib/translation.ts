@@ -41,6 +41,8 @@ export class Translation {
 
   private lookupIgnoringBreakNewlines: TranslationLookup = {};
 
+  private lookupNormalizedHtml = new Map<string, string | null>();
+
   private readonly loadingSubjectSrc = new BehaviorSubject(false);
 
   public readonly isLoadingLang$ = this.loadingSubjectSrc.asObservable();
@@ -190,18 +192,41 @@ export class Translation {
     return this.gettextWithoutEnsureLoaded(text, params, context);
   }
 
-  private gettextWithoutEnsureLoaded(
+  translateHtml(
     text: string,
     params?: TranslationParams,
     context = '',
   ): string {
+    return this.gettextWithoutEnsureLoaded(text, params, context, true);
+  }
+
+  private gettextWithoutEnsureLoaded(
+    text: string,
+    params?: TranslationParams,
+    context = '',
+    html = false,
+  ): string {
     const key = this.key(text, context);
-    const translated =
-      this.lookup[key] ??
-      this.lookupIgnoringBreakNewlines[
-        this.key(this.normalizeBreakNewlines(text), context)
-      ] ??
-      text;
+    const exact = this.lookup[key];
+    let translated = exact ?? text;
+
+    if (exact === undefined) {
+      const normalizedHtml = html
+        ? this.lookupNormalizedHtml.get(
+            this.key(this.normalizeHtmlKey(text), context),
+          )
+        : undefined;
+
+      // A null entry means different translations share this normalized key.
+      if (normalizedHtml !== null) {
+        translated =
+          normalizedHtml ??
+          this.lookupIgnoringBreakNewlines[
+            this.key(this.normalizeBreakNewlines(text), context)
+          ] ??
+          text;
+      }
+    }
 
     if (this.debug) {
       console.log(
@@ -286,6 +311,7 @@ export class Translation {
   private createLookup(files: UtilsI18n.GettextFile[]): TranslationLookup {
     const lookup: TranslationLookup = {};
     const lookupIgnoringBreakNewlines: TranslationLookup = {};
+    const lookupNormalizedHtml = new Map<string, string | null>();
 
     for (const file of files) {
       for (const tag of file.tags ?? []) {
@@ -300,10 +326,23 @@ export class Translation {
         lookupIgnoringBreakNewlines[
           this.key(this.normalizeBreakNewlines(text), context)
         ] = tag.translation;
+
+        if (/<[a-z][\s\S]*?>/i.test(text)) {
+          const htmlKey = this.key(this.normalizeHtmlKey(text), context);
+          const existing = lookupNormalizedHtml.get(htmlKey);
+
+          if (existing === undefined) {
+            lookupNormalizedHtml.set(htmlKey, tag.translation);
+          } else if (existing !== tag.translation) {
+            lookupNormalizedHtml.set(htmlKey, null);
+          }
+        }
       }
     }
 
     this.lookupIgnoringBreakNewlines = lookupIgnoringBreakNewlines;
+    this.lookupNormalizedHtml = lookupNormalizedHtml;
+
     return lookup;
   }
   //#endregion
@@ -315,6 +354,48 @@ export class Translation {
 
   private normalizeBreakNewlines(text: string): string {
     return text.replace(/<br\s*\/?>(?:[ \t]*\r?\n[ \t]*)*/gi, '<br>');
+  }
+
+  private normalizeHtmlKey(html: string): string {
+    return html
+      .replace(/&#(?:0*64|x0*40);/gi, '@')
+      .replace(/<br\s*\/?>/gi, '<br>')
+      .replace(
+        /<a\b((?:"[^"]*"|'[^']*'|[^"'<>])*)>/gi,
+        (tag: string, attributes: string) => {
+          const entries: string[] = [];
+
+          const remaining = attributes
+            .replace(
+              /([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g,
+              (
+                _match: string,
+                name: string,
+                doubleQuoted?: string,
+                singleQuoted?: string,
+              ) => {
+                const value = doubleQuoted ?? singleQuoted;
+                entries.push(`${name.toLowerCase()}=${JSON.stringify(value)}`);
+                return '';
+              },
+            )
+            .trim();
+
+          if (remaining) {
+            return tag;
+          }
+
+          return entries.length ? `<a ${entries.sort().join(' ')}>` : '<a>';
+        },
+      )
+      .replace(/[ \t\r\n\f]+/g, ' ')
+      .replace(/ *<br> */g, '<br>')
+      .replace(/(<strong>) +(?=<a\b)/gi, '$1')
+      .replace(/(<\/a>) +(?=<\/strong>)/gi, '$1')
+      .replace(/[ \t\r\n\f]+/g, ' ')
+      .replace(/ *> */g, '>')
+      .replace(/ *< */g, '<')
+      .trim();
   }
   //#endregion
 
@@ -367,3 +448,4 @@ class AnyAngularOrTaonClass {
 }
   */
 //#endregion
+
