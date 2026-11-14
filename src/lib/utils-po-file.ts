@@ -41,15 +41,16 @@ export namespace UtilsPoFile {
 
     for (const file of files) {
       for (const tag of file.tags) {
-        const context = tag.context || '';
-        const key = `${context}\u0004${tag.gettextString}`;
+        const context = normalizeLineEndings(tag.context || '');
+        const msgid = normalizeLineEndings(tag.gettextString);
+        const key = `${context}\u0004${msgid}`;
 
         let entry = entries.get(key);
 
         if (!entry) {
           entry = {
-            msgid: tag.gettextString,
-            context: tag.context,
+            msgid,
+            context,
             translation: tag.translation,
             refs: [],
           };
@@ -223,7 +224,7 @@ export namespace UtilsPoFile {
   function getGettextTagKey(
     tag: Pick<UtilsI18n.GettextExtracted, 'gettextString' | 'context'>,
   ): string {
-    return `${tag.context ?? ''}\u0004${tag.gettextString}`;
+    return `${normalizeLineEndings(tag.context ?? '')}\u0004${normalizeLineEndings(tag.gettextString)}`;
   }
 
   interface ParsedPoEntry {
@@ -235,8 +236,9 @@ export namespace UtilsPoFile {
 
   function parsePoEntries(po: string): ParsedPoEntry[] {
     //#region @backendFunc
-    const normalizedPo = po.replace(/^\uFEFF/, '');
-    const lines = normalizedPo.split(/\r?\n/);
+    const normalizedPo = normalizeLineEndings(po.replace(/^\uFEFF/, ''));
+
+    const lines = normalizedPo.split('\n');
 
     const entries: ParsedPoEntry[] = [];
 
@@ -322,10 +324,11 @@ export namespace UtilsPoFile {
   }
 
   function escapePoString(value: string): string {
-    return value
+    return normalizeLineEndings(value)
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n');
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t');
   }
 
   function readPoQuoted(value: string): string {
@@ -333,6 +336,27 @@ export namespace UtilsPoFile {
     if (!match) return '';
 
     return unescapePoString(match[1]);
+  }
+
+  function unescapePoString(value: string): string {
+    return normalizeLineEndings(
+      value.replace(/\\([\\nrt"])/g, (_, char: string) => {
+        switch (char) {
+          case 'n':
+            return '\n';
+          case 'r':
+            return '\n';
+          case 't':
+            return '\t';
+          case '"':
+            return '"';
+          case '\\':
+            return '\\';
+          default:
+            return char;
+        }
+      }),
+    );
   }
 
   function normalizePoTranslation(
@@ -345,11 +369,9 @@ export namespace UtilsPoFile {
     return translation.trim().length > 0 ? translation : undefined;
   }
 
-  function unescapePoString(value: string): string {
-    return value
-      .replace(/\\n/g, '\n')
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\');
+  function normalizeLineEndings(value: string): string {
+    return value.replace(/\r\n?/g, '\n');
   }
+
   //#endregion
 }
